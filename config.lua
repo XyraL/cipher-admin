@@ -4,7 +4,7 @@ Config = {}
 -- Players with ANY of these identifiers are always Owner regardless of DB role.
 -- Find yours with: print(GetPlayerIdentifierByType(source, 'license'))
 Config.Owners = {
-    'license:6f1fef032ec20472a82677af7467d2dee98db836',
+    '',
 }
 
 -- ── Keybind ───────────────────────────────────────────────────────────────────
