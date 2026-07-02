@@ -6,6 +6,7 @@ local QBX = exports['qbx_core']
 local _roles       = {}   -- name -> { label, color, permissions }
 local _assignments = {}   -- citizenid -> roleName
 local _adminCache  = {}   -- source -> { citizenid, name, role, permissions, isOwner }
+local _dutyAdmins  = {}   -- citizenid -> { name, role, roleLabel, roleColor, since }
 
 -- ── Helpers ───────────────────────────────────────────────────────────────────
 local function GetIdentifiers(src)
@@ -169,7 +170,12 @@ end)
 -- ── Join-time tracking (for online duration) ─────────────────────────────────
 local _joinTimes = {}
 AddEventHandler('playerConnecting', function() _joinTimes[source] = os.time() end)
-AddEventHandler('playerDropped',    function() _adminCache[source] = nil; _joinTimes[source] = nil end)
+AddEventHandler('playerDropped', function()
+    local a = _adminCache[source]
+    if a and a.citizenid then _dutyAdmins[a.citizenid] = nil end
+    _adminCache[source] = nil
+    _joinTimes[source]  = nil
+end)
 
 -- ── Admin Chat ────────────────────────────────────────────────────────────────
 RegisterNetEvent('cipher-admin:server:adminChat')
@@ -214,8 +220,36 @@ lib.callback.register('cipher-admin:server:open', function(src)
         warnToday    = warnToday,
         bansToday    = bansToday,
         onlineAdmins = onlineAdmins,
-        banPresets   = Config.BanDurationPresets,
+        banPresets       = Config.BanDurationPresets,
+        quickBanReasons  = Config.QuickBanReasons,
+        quickWarnReasons = Config.QuickWarnReasons,
+        dutyAdmins       = _dutyAdmins,
+        onDuty           = _dutyAdmins[a and a.citizenid] ~= nil,
     }
+end)
+
+-- ── Admin duty toggle ─────────────────────────────────────────────────────────
+lib.callback.register('cipher-admin:server:setAdminDuty', function(src, data)
+    if not IsAdmin(src) then return false end
+    local a = _adminCache[src]
+    if not a or not a.citizenid then return false end
+    if data.onDuty then
+        _dutyAdmins[a.citizenid] = {
+            name      = a.name,
+            role      = a.role,
+            roleLabel = a.roleLabel,
+            roleColor = a.roleColor,
+            since     = os.time(),
+        }
+    else
+        _dutyAdmins[a.citizenid] = nil
+    end
+    return true
+end)
+
+lib.callback.register('cipher-admin:server:getDutyAdmins', function(src)
+    if not IsAdmin(src) then return nil end
+    return _dutyAdmins
 end)
 
 -- ── NUI: Get online players ───────────────────────────────────────────────────

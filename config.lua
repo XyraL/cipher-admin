@@ -252,5 +252,30 @@ Config.WarningThresholds = {
     { count = 5,  action = 'tempban', duration = 86400, reason = 'Auto-ban: 5 warnings (24h)' },
 }
 
+-- ── Quick Ban Reasons ─────────────────────────────────────────────────────────
+-- Shown as preset buttons in the ban modal. Edit to match your server rules.
+Config.QuickBanReasons = {
+    'Cheating / Hacking',
+    'Repeated RDM',
+    'Racial Slurs / Hate Speech',
+    'Harassment',
+    'Ban Evasion',
+    'DDoS Threats',
+    'Staff Disrespect',
+    'Exploiting',
+}
+
+-- ── Quick Warn Reasons ────────────────────────────────────────────────────────
+Config.QuickWarnReasons = {
+    'RDM',
+    'VDM',
+    'Metagaming',
+    'Powergaming',
+    'NITRP',
+    'Fail RP',
+    'Exploiting',
+    'Cop Baiting',
+}
+
 -- ── Server Info ───────────────────────────────────────────────────────────────
 Config.ServerName = 'My FiveM Server'

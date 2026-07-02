@@ -241,13 +241,14 @@ function renderPlayerProfile(p) {
         <!-- Warnings -->
         <div class="profile-section">
             <div class="profile-section-title">Warnings (${(p.warnings || []).length})</div>
-            ${(p.warnings && p.warnings.length) ? p.warnings.slice(0,5).map(w => `
-                <div class="activity-item">
+            ${(p.warnings && p.warnings.length) ? p.warnings.map(w => `
+                <div class="activity-item" style="align-items:flex-start">
                     <div class="activity-icon">⚠️</div>
-                    <div class="activity-body">
+                    <div class="activity-body" style="flex:1">
                         <div class="activity-action">${w.reason}</div>
                         <div class="activity-detail">by ${w.admin_name} · ${formatDate(w.created_at)}</div>
                     </div>
+                    ${canWarn ? `<button class="btn btn-ghost btn-xs" style="color:var(--red);flex-shrink:0" onclick="deleteWarning(${w.id},'${p.citizenid}',${src})">✕</button>` : ''}
                 </div>
             `).join('') : '<div class="text-muted text-sm">No warnings</div>'}
         </div>
@@ -304,7 +305,15 @@ function doKick(src, cid, name) {
     loadPlayers();
 }
 
+async function deleteWarning(warnId, cid, src) {
+    await caFetch('cipher-admin:server:deleteWarning', { warnId, citizenid: cid });
+    selectPlayer(src);
+}
+
 function openWarnModal(src, cid, name) {
+    const reasons = CA.quickWarnReasons && CA.quickWarnReasons.length
+        ? CA.quickWarnReasons
+        : ['RDM','VDM','Metagaming','Powergaming','NITRP','Fail RP','Exploiting'];
     openModal(`Warn — ${name}`, `
         <div class="form-group">
             <label>Reason</label>
@@ -313,8 +322,8 @@ function openWarnModal(src, cid, name) {
         <div class="form-group">
             <label>Quick reasons</label>
             <div class="flex gap-4" style="flex-wrap:wrap">
-                ${['RDM','VDM','Metagaming','Powergaming','NITRP','Fail RP','Exploiting'].map(r =>
-                    `<button class="btn btn-ghost btn-xs" onclick="setWarnReason('${r}')">${r}</button>`
+                ${reasons.map(r =>
+                    `<button class="btn btn-ghost btn-xs" onclick="setWarnReason('${r.replace(/'/g,"\\'")}'">${r}</button>`
                 ).join('')}
             </div>
         </div>
@@ -337,6 +346,9 @@ async function doWarn(src, cid, name) {
 }
 
 function openBanModal(src, cid, name) {
+    const reasons = CA.quickBanReasons && CA.quickBanReasons.length
+        ? CA.quickBanReasons
+        : ['Cheating / Hacking','Repeated RDM','Racial Slurs','Harassment','Ban Evasion','DDoS Threats'];
     openModal(`Ban — ${name}`, `
         <div class="form-group">
             <label>Reason</label>
@@ -351,8 +363,8 @@ function openBanModal(src, cid, name) {
         <div class="form-group">
             <label>Quick reasons</label>
             <div class="flex gap-4" style="flex-wrap:wrap">
-                ${['Cheating/Hacking','Repeated RDM','Racial Slurs','Harassment','Ban Evasion','DDoS Threats'].map(r =>
-                    `<button class="btn btn-ghost btn-xs" onclick="setBanReason('${r}')">${r}</button>`
+                ${reasons.map(r =>
+                    `<button class="btn btn-ghost btn-xs" onclick="setBanReason('${r.replace(/'/g,"\\'")}'">${r}</button>`
                 ).join('')}
             </div>
         </div>
@@ -511,6 +523,7 @@ window.renderPlayerProfile = renderPlayerProfile;
 window.playerAction        = playerAction;
 window.openKickModal       = openKickModal;
 window.doKick              = doKick;
+window.deleteWarning       = deleteWarning;
 window.openWarnModal       = openWarnModal;
 window.setWarnReason       = setWarnReason;
 window.doWarn              = doWarn;

@@ -1,11 +1,15 @@
 // Cipher-Admin — Core NUI Bridge
 
 const CA = {
-    admin:       null,
-    serverName:  '',
-    playerCount: 0,
-    banPresets:  [],
-    currentPanel: 'dashboard',
+    admin:            null,
+    serverName:       '',
+    playerCount:      0,
+    banPresets:       [],
+    quickBanReasons:  [],
+    quickWarnReasons: [],
+    onDuty:           false,
+    dutyAdmins:       {},
+    currentPanel:     'dashboard',
 };
 
 // ── NUI fetch wrapper ──────────────────────────────────────────────────────────
@@ -49,7 +53,11 @@ function onOpen(data) {
     CA.admin       = data.admin;
     CA.serverName  = data.serverName;
     CA.playerCount = data.playerCount;
-    CA.banPresets  = data.banPresets || [];
+    CA.banPresets       = data.banPresets       || [];
+    CA.quickBanReasons  = data.quickBanReasons  || [];
+    CA.quickWarnReasons = data.quickWarnReasons || [];
+    CA.onDuty           = data.onDuty           || false;
+    CA.dutyAdmins       = data.dutyAdmins       || {};
 
     document.getElementById('admin-overlay').classList.remove('hidden');
     document.getElementById('sidebar-server-name').textContent = data.serverName;
@@ -78,8 +86,35 @@ function renderAdminBadge(admin) {
     el.innerHTML = `
         <div class="badge-name">${admin.name || 'Admin'}</div>
         <span class="badge-role" style="background:${admin.roleColor}22;color:${admin.roleColor}">${admin.roleLabel || admin.role}</span>
+        <button class="btn btn-xs mt-4" id="duty-btn" onclick="toggleAdminDuty()" style="width:100%;margin-top:6px"></button>
     `;
+    _updateDutyBtn();
 }
+
+function _updateDutyBtn() {
+    const btn = document.getElementById('duty-btn');
+    if (!btn) return;
+    if (CA.onDuty) {
+        btn.className = 'btn btn-xs btn-success';
+        btn.style.width = '100%';
+        btn.style.marginTop = '6px';
+        btn.textContent = '● On Duty';
+    } else {
+        btn.className = 'btn btn-xs btn-ghost';
+        btn.style.width = '100%';
+        btn.style.marginTop = '6px';
+        btn.textContent = '○ Go On Duty';
+    }
+}
+
+async function toggleAdminDuty() {
+    CA.onDuty = !CA.onDuty;
+    _updateDutyBtn();
+    await caFetch('cipher-admin:server:setAdminDuty', { onDuty: CA.onDuty });
+    if (CA.currentPanel === 'dashboard') loadDutyAdmins();
+}
+
+window.toggleAdminDuty = toggleAdminDuty;
 
 // ── Clock ─────────────────────────────────────────────────────────────────────
 let _clockInterval = null;

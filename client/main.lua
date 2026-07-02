@@ -89,6 +89,8 @@ local PROXY_ENDPOINTS = {
     'cipher-admin:server:getStats',
     'cipher-admin:server:getAdminInventory',
     'cipher-admin:server:transferItem',
+    'cipher-admin:server:setAdminDuty',
+    'cipher-admin:server:getDutyAdmins',
 }
 
 for _, endpoint in ipairs(PROXY_ENDPOINTS) do

@@ -30,6 +30,16 @@ function loadDashboard(data) {
             </div>
         </div>
 
+        <div id="dash-duty-section" class="card mb-12">
+            <div class="card-header">
+                <span class="card-title">On-Duty Staff</span>
+                <span id="dash-duty-count" class="badge badge-muted">loading...</span>
+            </div>
+            <div class="card-body" id="dash-duty-list" style="padding:8px 12px">
+                <div class="text-muted text-sm">Loading...</div>
+            </div>
+        </div>
+
         <div class="dash-grid">
             <div class="card">
                 <div class="card-header">
@@ -62,6 +72,7 @@ function loadDashboard(data) {
     `;
 
     loadRecentActivity();
+    loadDutyAdmins();
 }
 
 async function loadRecentActivity() {
@@ -94,6 +105,30 @@ async function loadRecentActivity() {
             <div class="activity-time">${timeAgo(r.created_at)}</div>
         </div>
     `).join('');
+}
+
+async function loadDutyAdmins() {
+    const list  = document.getElementById('dash-duty-list');
+    const count = document.getElementById('dash-duty-count');
+    if (!list) return;
+    const duty = await caFetch('cipher-admin:server:getDutyAdmins', {}) || {};
+    CA.dutyAdmins = duty;
+    const entries = Object.entries(duty);
+    if (count) count.textContent = entries.length + ' online';
+    if (!entries.length) {
+        list.innerHTML = '<div class="text-muted text-sm">No staff on duty</div>';
+        return;
+    }
+    list.innerHTML = entries.map(([cid, a]) => {
+        const mins = Math.floor((Date.now() / 1000 - (a.since || 0)) / 60);
+        const dur  = mins < 60 ? mins + 'm' : Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm';
+        return `<div class="flex items-center gap-8" style="padding:4px 0;border-bottom:1px solid var(--border)">
+            <span class="status-dot online"></span>
+            <span style="flex:1;font-size:13px">${a.name}</span>
+            <span class="badge badge-muted" style="background:${a.roleColor}22;color:${a.roleColor}">${a.roleLabel}</span>
+            <span class="text-muted text-sm">${dur}</span>
+        </div>`;
+    }).join('');
 }
 
 // ── Announcement modal ────────────────────────────────────────────────────────
@@ -196,6 +231,7 @@ function toggleInvisible() {
 }
 
 window.loadDashboard        = loadDashboard;
+window.loadDutyAdmins       = loadDutyAdmins;
 window.openAnnouncementModal = openAnnouncementModal;
 window.sendAnnouncement     = sendAnnouncement;
 window.openWeatherModal     = openWeatherModal;
