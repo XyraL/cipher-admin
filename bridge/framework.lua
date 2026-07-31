@@ -17,6 +17,34 @@
 -- using `player.PlayerData.citizenid` and `player.Functions.AddMoney(...)`
 -- exactly as before.
 -- ─────────────────────────────────────────────────────────────
+-- ── NUI response guard (client only) ─────────────────────────
+-- cb(nil) sends no response body at all, so the page's fetch never settles —
+-- not resolved, not rejected, just pending forever, and whatever panel was
+-- awaiting it sits on "Loading..." for good.
+--
+-- Sixteen server callbacks here can legitimately return nil: getInventory when
+-- the player isn't found, getCharacter on a bad search, and so on. Every one
+-- of those was a potential permanent hang.
+--
+-- false is the right substitute — it encodes to JSON, and every consumer in
+-- the panel tests these results for truthiness (`if (!targetData)`,
+-- `rows || []`), so "no data" still reads as "no data".
+--
+-- Found while fixing the identical bug in cipher-trucking, where it was the
+-- root cause of tabs never finishing loading.
+if not IsDuplicityVersion() and type(RegisterNUICallback) == 'function' then
+    local _registerNUI = RegisterNUICallback
+
+    RegisterNUICallback = function(name, handler)
+        return _registerNUI(name, function(data, cb)
+            handler(data, function(payload, ...)
+                if payload == nil then payload = false end
+                cb(payload, ...)
+            end)
+        end)
+    end
+end
+
 Framework = { name = nil, core = nil }
 
 if GetResourceState('qbx_core') == 'started' then

@@ -2,6 +2,17 @@
 
 All notable changes to **Cipher-Admin**.
 
+## [1.1.3] — 2026-07-31
+
+### Fixed
+- **Panels could hang on "Loading..." forever.** `cb(nil)` sends no response
+  body, so the page's fetch never settles — not resolved, not rejected, just
+  pending. Sixteen server callbacks can legitimately return nil, including
+  `getInventory` when the player isn't found and `getCharacter` on a search
+  that matches nothing, so a failed lookup hung the panel instead of showing
+  an empty state. Every NUI response now substitutes `false` for a nil
+  payload. Found while fixing the same bug in Cipher-Trucking.
+
 ## [1.1.2] — 2026-07-31
 
 ### Fixed
