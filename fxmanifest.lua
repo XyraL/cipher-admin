@@ -3,7 +3,7 @@ game 'gta5'
 
 name        'Cipher-Admin'
 description 'Advanced Admin Suite for QBox / QBCore'
-version     '1.1.1'
+version     '1.1.2'
 author      'XyraL'
 
 shared_scripts {

@@ -2,6 +2,22 @@
 
 All notable changes to **Cipher-Admin**.
 
+## [1.1.2] — 2026-07-31
+
+### Fixed
+- **Inventory viewer could not find players by name.** The search box is
+  labelled "Name (online) or Citizenid", but only citizenid was ever matched —
+  a name fell straight through and was handed to the inventory resource as if
+  it were an inventory id, which returned nothing with no error. Names now
+  resolve by exact citizenid, then exact full name, then a unique partial
+  match, then as an offline citizenid. A partial only wins when exactly one
+  player matches, so an ambiguous search opens nobody rather than the wrong
+  person.
+- Give, remove, transfer and clear read the player source straight from the
+  request, which is empty on a name search — so on qb-inventory and
+  qs-inventory those actions silently did nothing for a player found by name.
+  They now use the resolved source.
+
 ## [1.1.1] — 2026-07-31
 
 ### Fixed
