@@ -1,5 +1,58 @@
 -- Cipher-Admin Server Core — permissions engine, auth, audit
 
+-- ── Boot self-check ───────────────────────────────────────────────────────────
+-- Names any server file that failed to load, instead of letting the symptom be
+-- a stream of "attempt to index a nil value (global 'Framework')" from a dozen
+-- unrelated line numbers.
+--
+-- This exists because that is exactly what happened on the 1.1.0 upgrade: the
+-- release added a NEW directory (bridge/), the upgrade copied the changed
+-- files but not the new folder, and every callback then failed pointing at
+-- itself rather than at the missing file. New directories are the easiest
+-- thing to miss when syncing a resource by hand.
+CreateThread(function()
+    local missing = {}
+    if Framework == nil then missing[#missing + 1] = 'bridge/framework.lua' end
+    if Config    == nil then missing[#missing + 1] = 'config.lua' end
+
+    if #missing == 0 then return end
+
+    print('^1[cipher-admin] ─────────────────────────────────────────────^0')
+    print('^1[cipher-admin] STARTUP INCOMPLETE — these files did not load:^0')
+    for _, f in ipairs(missing) do print(('^1[cipher-admin]   • %s^0'):format(f)) end
+    print('^1[cipher-admin] Re-upload the ENTIRE cipher-admin folder, including^0')
+    print('^1[cipher-admin] any NEW directories, then restart the resource.^0')
+    print('^1[cipher-admin] ─────────────────────────────────────────────^0')
+end)
+
+-- ── Callback safety net ───────────────────────────────────────────────────────
+-- Wraps every lib.callback.register in this resource so a handler that errors
+-- still sends a response.
+--
+-- Without it, an unhandled error means cb() is never called, so the client's
+-- await never returns, so the panel's fetch never settles and the tab sits
+-- loading forever with no explanation. Patching the registrar covers every
+-- callback across all seven server files, including any added later.
+--
+-- Placed at the top of the first server file that registers anything, so the
+-- override is installed before any registration happens.
+do
+    local _register = lib.callback.register
+
+    lib.callback.register = function(name, fn)
+        return _register(name, function(src, ...)
+            local results = { pcall(fn, src, ...) }
+
+            if not results[1] then
+                print(('^1[cipher-admin]^0 callback "%s" errored — returning nil so the UI does not hang.\n  %s')
+                    :format(name, tostring(results[2])))
+                return nil
+            end
+
+            return table.unpack(results, 2)
+        end)
+    end
+end
 
 -- ── In-memory caches ──────────────────────────────────────────────────────────
 local _roles       = {}   -- name -> { label, color, permissions }

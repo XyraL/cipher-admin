@@ -2,6 +2,25 @@
 
 All notable changes to **Cipher-Admin**.
 
+## [1.1.1] — 2026-07-31
+
+### Fixed
+- **Diagnosing a partial upgrade.** 1.1.0 added a new `bridge/` directory. If
+  an upgrade copies the changed files but misses that new folder, `Framework`
+  never gets defined and every callback fails with
+  `attempt to index a nil value (global 'Framework')`, each error pointing at
+  itself rather than at the missing file. A boot self-check now names any
+  server file that failed to load, and tells you to re-upload the whole
+  folder including new directories.
+- **Callbacks that error no longer hang the panel.** An unhandled error meant
+  the response was never sent, so the client kept waiting and the tab loaded
+  forever with nothing to explain it. Every `lib.callback.register` in the
+  resource is now wrapped so a failing handler still responds and logs itself
+  by name.
+
+> Upgrading from 1.1.0: replace the **entire** folder. `bridge/framework.lua`
+> is required and is a new directory.
+
 ## [1.1.0] — 2026-07-30
 
 ### Added
