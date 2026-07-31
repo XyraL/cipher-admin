@@ -1,6 +1,5 @@
 -- Cipher-Admin Server — Ban & Warning System
 
-local QBX          = exports['qbx_core']
 local IsAdmin       = function(src) return exports['cipher-admin']:IsAdmin(src) end
 local HasPermission = function(src, p) return exports['cipher-admin']:HasPermission(src, p) end
 local GetAdminCache = function(src) return exports['cipher-admin']:GetAdminCache(src) end

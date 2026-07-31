@@ -14,7 +14,7 @@ local function ResolveInvKey(data)
     if query ~= '' then
         for _, psrc in ipairs(GetPlayers()) do
             local pid = tonumber(psrc)
-            local p   = exports['qbx_core']:GetPlayer(pid)
+            local p   = Framework.GetPlayer(pid)
             if p and (p.PlayerData.citizenid or ''):lower() == query then
                 return pid
             end
@@ -105,7 +105,7 @@ lib.callback.register('cipher-admin:server:giveItem', function(src, data)
     if res == 'ox_inventory' then
         exports.ox_inventory:AddItem(invKey, item, count, data.metadata)
     elseif res == 'qb-inventory' then
-        local p = exports['qbx_core']:GetPlayer(tonumber(data.targetSrc))
+        local p = Framework.GetPlayer(tonumber(data.targetSrc))
         if p then p.Functions.AddItem(item, count, false, data.metadata) end
     elseif res == 'qs-inventory' then
         exports['qs-inventory']:AddItem(tonumber(data.targetSrc), item, count, data.metadata)
@@ -130,7 +130,7 @@ lib.callback.register('cipher-admin:server:removeItem', function(src, data)
     if res == 'ox_inventory' then
         exports.ox_inventory:RemoveItem(invKey, item, count)
     elseif res == 'qb-inventory' then
-        local p = exports['qbx_core']:GetPlayer(tonumber(data.targetSrc))
+        local p = Framework.GetPlayer(tonumber(data.targetSrc))
         if p then p.Functions.RemoveItem(item, count) end
     elseif res == 'qs-inventory' then
         exports['qs-inventory']:RemoveItem(tonumber(data.targetSrc), item, count)
@@ -181,7 +181,7 @@ lib.callback.register('cipher-admin:server:clearInventory', function(src, data)
     if res == 'ox_inventory' then
         exports.ox_inventory:ClearInventory(invKey)
     elseif res == 'qb-inventory' then
-        local p = exports['qbx_core']:GetPlayer(tonumber(data.targetSrc))
+        local p = Framework.GetPlayer(tonumber(data.targetSrc))
         if p then
             for _, item in pairs(p.PlayerData.items or {}) do
                 if item then p.Functions.RemoveItem(item.name, item.amount) end

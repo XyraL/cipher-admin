@@ -18,6 +18,16 @@ Config.AuditWebhook = ''
 -- 'ox_inventory' | 'qb-inventory' | 'qs-inventory'
 Config.InventoryResource = 'ox_inventory'
 
+-- ── Appearance Resource ───────────────────────────────────────────────────────
+-- Drives the Self Actions "Clothing" and "Revert Ped" buttons.
+-- 'illenium-appearance' | 'fivem-appearance' | 'qb-clothing' | 'rcore_clothing' | 'qbx_core'
+--
+-- This used to be hardcoded to qb-clothing, which meant both buttons silently
+-- did nothing on the QBox servers this resource actually targets — they
+-- typically run illenium-appearance. Set it to whatever you have installed;
+-- an unrecognised value now reports itself instead of failing quietly.
+Config.AppearanceResource = 'illenium-appearance'
+
 -- ── Default Roles ─────────────────────────────────────────────────────────────
 -- Seeded into DB on first start if the roles table is empty.
 -- After first start, manage roles live from the Permissions panel.

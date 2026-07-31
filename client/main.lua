@@ -371,6 +371,111 @@ local function ToggleGodMode()
 end
 
 -- ── Self Action NUI callback ──────────────────────────────────────────────────
+-- ── Self-action state & helpers ──────────────────────────────────────────────
+_infStaminaOn, _fireproofOn, _noRagdollOn = false, false, false
+_vehGodOn, _freezeTimeOn, _blackoutOn = false, false, false
+_savedPosition, _lastPosition = nil, nil
+
+-- 1.0 = stock. Applied every frame because the density natives only hold for
+-- the frame they're called in.
+_trafficDensity, _pedDensity = 1.0, 1.0
+
+CreateThread(function()
+    while true do
+        if _trafficDensity < 1.0 or _pedDensity < 1.0 then
+            SetVehicleDensityMultiplierThisFrame(_trafficDensity)
+            SetRandomVehicleDensityMultiplierThisFrame(_trafficDensity)
+            SetParkedVehicleDensityMultiplierThisFrame(_trafficDensity)
+            SetPedDensityMultiplierThisFrame(_pedDensity)
+            SetScenarioPedDensityMultiplierThisFrame(_pedDensity, _pedDensity)
+            Wait(0)
+        else
+            Wait(500)
+        end
+    end
+end)
+
+-- Captured before every teleport so 'tpback' has somewhere to return to.
+function RememberPosition()
+    local c = GetEntityCoords(PlayerPedId())
+    _lastPosition = { x = c.x, y = c.y, z = c.z }
+end
+
+function NearestVehicle(radius)
+    local pos = GetEntityCoords(PlayerPedId())
+    return GetClosestVehicle(pos.x, pos.y, pos.z, radius or 25.0, 0, 70)
+end
+
+function SetPedModelSafely(model)
+    local hash = GetHashKey(model)
+    if not IsModelInCdimage(hash) or not IsModelValid(hash) then
+        lib.notify({ title = 'Model not found', description = model, type = 'error' })
+        return false
+    end
+    RequestModel(hash)
+    local t = 0
+    while not HasModelLoaded(hash) do
+        Wait(50); t = t + 50
+        if t > 5000 then
+            lib.notify({ title = 'Model failed to load', description = model, type = 'error' })
+            return false
+        end
+    end
+    SetPlayerModel(PlayerId(), hash)
+    SetPedDefaultComponentVariation(PlayerPedId())
+    SetModelAsNoLongerNeeded(hash)
+    lib.notify({ title = 'Ped model set', description = model, type = 'success' })
+    return true
+end
+
+-- Reapplying the character's OWN appearance is framework/resource specific —
+-- a bare SetPlayerModel would put them in a default freemode body and throw
+-- away their saved clothing. Ask whichever appearance resource is configured.
+function RevertToOwnPed()
+    local res = Config.AppearanceResource
+    if res == 'illenium-appearance' or res == 'fivem-appearance' then
+        TriggerEvent(res .. ':client:reloadSkin')
+    elseif res == 'qb-clothing' then
+        TriggerServerEvent('qb-clothes:loadPlayerSkin')
+    elseif res == 'qbx_core' then
+        TriggerEvent('qbx_core:client:playerLoaded')
+    else
+        lib.notify({ title = 'Cannot revert ped',
+            description = 'Set Config.AppearanceResource to your appearance script.', type = 'error' })
+        return
+    end
+    lib.notify({ title = 'Appearance reloaded', type = 'success' })
+end
+
+function OpenAppearanceMenu()
+    local res = Config.AppearanceResource
+    if res == 'illenium-appearance' or res == 'fivem-appearance' then
+        TriggerEvent(res .. ':client:openClothingShopMenu')
+    elseif res == 'qb-clothing' then
+        TriggerEvent('qb-clothing:client:openMenu')
+    elseif res == 'rcore_clothing' then
+        TriggerEvent('rcore_clothing:openClothing')
+    else
+        lib.notify({ title = 'No appearance resource configured',
+            description = 'Set Config.AppearanceResource in config.lua.', type = 'error' })
+    end
+end
+
+-- Screen-centre raycast, used by Entity Info. Ignores the player's own ped so
+-- looking straight down doesn't just report yourself.
+function RaycastFromCamera(distance)
+    local cam = GetGameplayCamCoord()
+    local rot = GetGameplayCamRot(2)
+    local rx, rz = math.rad(rot.x), math.rad(rot.z)
+    local absX = math.abs(math.cos(rx))
+    local dir = vector3(-math.sin(rz) * absX, math.cos(rz) * absX, math.sin(rx))
+    local dest = cam + (dir * (distance or 30.0))
+    local ray = StartShapeTestRay(cam.x, cam.y, cam.z, dest.x, dest.y, dest.z, -1, PlayerPedId(), 0)
+    local _, hit, _, _, entity = GetShapeTestResult(ray)
+    if hit == 1 then return entity end
+    return 0
+end
+
 RegisterNUICallback('selfAction', function(data, cb)
     local action = data.action
 
@@ -418,7 +523,255 @@ RegisterNUICallback('selfAction', function(data, cb)
         lib.notify({ title = 'Ped Model Set', description = model, type = 'success' })
 
     elseif action == 'clothing' then
-        TriggerEvent('qb-clothing:client:openMenu')
+        -- Was hardcoded to qb-clothing, which does not exist on most QBox
+        -- servers (illenium-appearance / fivem-appearance are the common
+        -- choices there), so this button silently did nothing for them.
+        -- Config.AppearanceResource now decides, and an unrecognised value
+        -- says so instead of failing quietly.
+        OpenAppearanceMenu()
+
+    -- ── Personal (extended) ──
+    elseif action == 'armour' then
+        SetPedArmour(PlayerPedId(), 100)
+        lib.notify({ title = 'Armour restored', type = 'success' })
+
+    elseif action == 'infstamina' then
+        _infStaminaOn = not _infStaminaOn
+        if _infStaminaOn then
+            Citizen.CreateThread(function()
+                while _infStaminaOn do
+                    RestorePlayerStamina(PlayerId(), 1.0)
+                    Wait(1000)
+                end
+            end)
+        end
+        lib.notify({ title = 'Infinite Stamina', description = _infStaminaOn and 'ON' or 'OFF', type = 'inform' })
+
+    elseif action == 'fireproof' then
+        _fireproofOn = not _fireproofOn
+        SetEntityProofs(PlayerPedId(), false, _fireproofOn, false, false, false, false, false, false)
+        lib.notify({ title = 'Fireproof', description = _fireproofOn and 'ON' or 'OFF', type = 'inform' })
+
+    elseif action == 'noragdoll' then
+        _noRagdollOn = not _noRagdollOn
+        SetPedCanRagdoll(PlayerPedId(), not _noRagdollOn)
+        lib.notify({ title = 'No Ragdoll', description = _noRagdollOn and 'ON' or 'OFF', type = 'inform' })
+
+    elseif action == 'clearwanted' then
+        ClearPlayerWantedLevel(PlayerId())
+        SetPlayerWantedLevel(PlayerId(), 0, false)
+        SetPlayerWantedLevelNow(PlayerId(), false)
+        lib.notify({ title = 'Wanted level cleared', type = 'success' })
+
+    elseif action == 'setwanted' then
+        local lvl = math.max(0, math.min(5, tonumber(data.level) or 0))
+        SetPlayerWantedLevel(PlayerId(), lvl, false)
+        SetPlayerWantedLevelNow(PlayerId(), false)
+        lib.notify({ title = ('Wanted level set to %d'):format(lvl), type = 'inform' })
+
+    -- ── Appearance (extended) ──
+    elseif action == 'randomped' then
+        local pool = {
+            'a_m_m_beach_01','a_f_y_beach_01','a_m_y_business_01','a_f_m_business_02',
+            'a_m_y_hipster_01','a_f_y_hipster_02','s_m_y_cop_01','s_m_m_paramedic_01',
+            'a_m_m_farmer_01','a_m_y_skater_01','g_m_y_lost_01','u_m_y_zombie_01',
+        }
+        SetPedModelSafely(pool[math.random(#pool)])
+
+    elseif action == 'revertped' then
+        -- Asks the framework to reapply the character's own appearance rather
+        -- than guessing a freemode model — the player may be either gender and
+        -- carries saved clothing that a bare SetPlayerModel would discard.
+        RevertToOwnPed()
+
+    elseif action == 'walkstyle' then
+        local style = data.style or 'RESET'
+        if style == 'RESET' then
+            ResetPedMovementClipset(PlayerPedId(), 0.0)
+            lib.notify({ title = 'Walk style reset', type = 'inform' })
+        else
+            RequestAnimSet(style)
+            local t = 0
+            while not HasAnimSetLoaded(style) and t < 3000 do Wait(50); t = t + 50 end
+            if HasAnimSetLoaded(style) then
+                SetPedMovementClipset(PlayerPedId(), style, 0.25)
+                lib.notify({ title = 'Walk style set', description = style, type = 'success' })
+            else
+                lib.notify({ title = 'Clipset not found', description = style, type = 'error' })
+            end
+        end
+
+    -- ── Movement (extended) ──
+    elseif action == 'tpcoords' then
+        local x, y, z = tonumber(data.x), tonumber(data.y), tonumber(data.z)
+        if not x or not y or not z then
+            lib.notify({ title = 'Invalid coordinates', type = 'error' })
+        else
+            RememberPosition()
+            SetEntityCoords(PlayerPedId(), x + 0.0, y + 0.0, z + 0.0, false, false, false, false)
+            lib.notify({ title = 'Teleported', description = ('%.1f, %.1f, %.1f'):format(x, y, z), type = 'success' })
+        end
+
+    elseif action == 'savepos' then
+        local c = GetEntityCoords(PlayerPedId())
+        _savedPosition = { x = c.x, y = c.y, z = c.z, h = GetEntityHeading(PlayerPedId()) }
+        lib.notify({ title = 'Position saved', description = ('%.1f, %.1f, %.1f'):format(c.x, c.y, c.z), type = 'success' })
+
+    elseif action == 'loadpos' then
+        if not _savedPosition then
+            lib.notify({ title = 'No saved position', description = 'Use Save Position first', type = 'error' })
+        else
+            RememberPosition()
+            SetEntityCoords(PlayerPedId(), _savedPosition.x, _savedPosition.y, _savedPosition.z, false, false, false, false)
+            SetEntityHeading(PlayerPedId(), _savedPosition.h or 0.0)
+            lib.notify({ title = 'Returned to saved position', type = 'success' })
+        end
+
+    elseif action == 'tpback' then
+        -- One level of undo, captured by RememberPosition before every
+        -- teleport this file performs. Deliberately not a stack: the case
+        -- that matters is "I meant to click the other one".
+        if not _lastPosition then
+            lib.notify({ title = 'Nowhere to go back to', type = 'error' })
+        else
+            local p = _lastPosition
+            _lastPosition = nil
+            SetEntityCoords(PlayerPedId(), p.x, p.y, p.z, false, false, false, false)
+            lib.notify({ title = 'Teleported back', type = 'success' })
+        end
+
+    -- ── Vehicle (extended) ──
+    elseif action == 'flipveh' then
+        local veh = GetVehiclePedIsIn(PlayerPedId(), false)
+        if veh == 0 then veh = NearestVehicle(25.0) end
+        if veh and veh ~= 0 then
+            SetVehicleOnGroundProperly(veh)
+            SetEntityRotation(veh, 0.0, 0.0, GetEntityHeading(veh), 2, true)
+            lib.notify({ title = 'Vehicle flipped upright', type = 'success' })
+        else
+            lib.notify({ title = 'No vehicle nearby', type = 'error' })
+        end
+
+    elseif action == 'refuelveh' then
+        local veh = GetVehiclePedIsIn(PlayerPedId(), false)
+        if veh and veh ~= 0 then
+            SetVehicleFuelLevel(veh, 100.0)
+            -- Most fuel resources read a statebag rather than the native, so
+            -- set both and let whichever is in use win.
+            Entity(veh).state:set('fuel', 100.0, true)
+            lib.notify({ title = 'Refuelled', type = 'success' })
+        else
+            lib.notify({ title = 'Must be inside a vehicle', type = 'error' })
+        end
+
+    elseif action == 'cleanveh' then
+        local veh = GetVehiclePedIsIn(PlayerPedId(), false)
+        if veh == 0 then veh = NearestVehicle(25.0) end
+        if veh and veh ~= 0 then
+            WashDecalsFromVehicle(veh, 1.0)
+            SetVehicleDirtLevel(veh, 0.0)
+            lib.notify({ title = 'Vehicle cleaned', type = 'success' })
+        else
+            lib.notify({ title = 'No vehicle nearby', type = 'error' })
+        end
+
+    elseif action == 'vehgod' then
+        _vehGodOn = not _vehGodOn
+        local veh = GetVehiclePedIsIn(PlayerPedId(), false)
+        if veh == 0 then veh = NearestVehicle(25.0) end
+        if veh and veh ~= 0 then
+            SetEntityInvincible(veh, _vehGodOn)
+            SetVehicleCanBeVisiblyDamaged(veh, not _vehGodOn)
+            SetVehicleTyresCanBurst(veh, not _vehGodOn)
+            SetVehicleWheelsCanBreak(veh, not _vehGodOn)
+            lib.notify({ title = 'Vehicle God', description = _vehGodOn and 'ON' or 'OFF', type = 'inform' })
+        else
+            lib.notify({ title = 'No vehicle nearby', type = 'error' })
+        end
+
+    elseif action == 'setplate' then
+        local veh = GetVehiclePedIsIn(PlayerPedId(), false)
+        if veh == 0 then veh = NearestVehicle(25.0) end
+        if veh and veh ~= 0 then
+            SetVehicleNumberPlateText(veh, tostring(data.plate or ''):sub(1, 8))
+            lib.notify({ title = 'Plate updated', description = data.plate, type = 'success' })
+        else
+            lib.notify({ title = 'No vehicle nearby', type = 'error' })
+        end
+
+    -- ── World (extended) ──
+    elseif action == 'freezetime' then
+        _freezeTimeOn = not _freezeTimeOn
+        -- Client-side only: it holds YOUR clock, it does not change the
+        -- server's. Use the Time action for that.
+        if _freezeTimeOn then
+            local h, m = GetClockHours(), GetClockMinutes()
+            Citizen.CreateThread(function()
+                while _freezeTimeOn do
+                    NetworkOverrideClockTime(h, m, 0)
+                    Wait(500)
+                end
+            end)
+        end
+        lib.notify({ title = 'Freeze Time', description = _freezeTimeOn and 'ON (local)' or 'OFF', type = 'inform' })
+
+    elseif action == 'blackout' then
+        _blackoutOn = not _blackoutOn
+        SetArtificialLightsState(_blackoutOn)
+        SetArtificialLightsStateAffectsVehicles(false)
+        lib.notify({ title = 'Blackout', description = _blackoutOn and 'ON (local)' or 'OFF', type = 'inform' })
+
+    elseif action == 'traffic' or action == 'peddensity' then
+        local v = tonumber(data.value) or 1.0
+        if action == 'traffic' then _trafficDensity = v else _pedDensity = v end
+        lib.notify({ title = action == 'traffic' and 'Traffic density' or 'Pedestrian density',
+                     description = ('%d%%'):format(math.floor(v * 100)), type = 'inform' })
+
+    -- ── Area (extended) ──
+    elseif action == 'clearvehicles' or action == 'clearpeds' or action == 'clearobjects' then
+        local ped = PlayerPedId()
+        local pos = GetEntityCoords(ped)
+        local r   = tonumber(data.radius) or 50.0
+        local pool = action == 'clearvehicles' and 'CVehicle'
+                  or action == 'clearpeds' and 'CPed'
+                  or 'CObject'
+        local n = 0
+        for _, e in ipairs(GetGamePool(pool)) do
+            -- Never delete the admin's own ped, another player, or the
+            -- vehicle the admin is currently sitting in.
+            local skip = (e == ped)
+                or (pool == 'CPed' and IsPedAPlayer(e))
+                or (pool == 'CVehicle' and e == GetVehiclePedIsIn(ped, false))
+            if not skip and #(GetEntityCoords(e) - pos) <= r then
+                SetEntityAsMissionEntity(e, true, true)
+                DeleteEntity(e)
+                n = n + 1
+            end
+        end
+        lib.notify({ title = 'Area cleared', description = ('%d removed within %dm'):format(n, r), type = 'success' })
+
+    -- ── Utility (extended) ──
+    elseif action == 'copyvector3' then
+        local c = GetEntityCoords(PlayerPedId())
+        cb({ vector = string.format('vector3(%.4f, %.4f, %.4f)', c.x, c.y, c.z) })
+        return
+
+    elseif action == 'entityinfo' then
+        local ent = RaycastFromCamera(30.0)
+        if not ent or ent == 0 or not DoesEntityExist(ent) then
+            lib.notify({ title = 'Nothing in view', description = 'Aim at an entity and try again', type = 'error' })
+        else
+            local kind = IsEntityAVehicle(ent) and 'Vehicle' or IsEntityAPed(ent) and 'Ped' or 'Object'
+            local model = GetEntityModel(ent)
+            local c = GetEntityCoords(ent)
+            lib.notify({
+                title = ('%s · %d'):format(kind, model),
+                description = ('net %s · %.1f, %.1f, %.1f'):format(
+                    NetworkGetEntityIsNetworked(ent) and NetworkGetNetworkIdFromEntity(ent) or 'local', c.x, c.y, c.z),
+                type = 'inform', duration = 12000,
+            })
+            print(('^3[cipher-admin]^0 %s model=%d coords=%.4f,%.4f,%.4f'):format(kind, model, c.x, c.y, c.z))
+        end
 
     -- Movement
     elseif action == 'noclip' then

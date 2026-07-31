@@ -9,7 +9,7 @@ Advanced admin panel for **QBox / QBCore** FiveM servers. Full NUI interface wit
 | Resource | Required |
 |---|---|
 | [ox_lib](https://github.com/overextended/ox_lib) | ✅ |
-| [qbx_core](https://github.com/Qbox-project/qbx_core) | ✅ |
+| [qbx_core](https://github.com/Qbox-project/qbx_core) **or** [qb-core](https://github.com/qbcore-framework/qb-core) | ✅ — whichever your server runs; the framework bridge auto-detects |
 | [oxmysql](https://github.com/overextended/oxmysql) | ✅ |
 | ox_inventory | Optional — enables inventory editing & transfer |
 | screenshot-basic **or** screencapture | Optional — enables screenshot feature |
@@ -60,6 +60,11 @@ Config.AuditWebhook = ''
 
 -- Inventory resource: 'ox_inventory' | 'qb-inventory' | 'qs-inventory'
 Config.InventoryResource = 'ox_inventory'
+
+-- Appearance resource — drives the Self Actions "Clothing" and "Revert Ped"
+-- buttons. Set this to whatever you actually run, or those two do nothing.
+-- 'illenium-appearance' | 'fivem-appearance' | 'qb-clothing' | 'rcore_clothing' | 'qbx_core'
+Config.AppearanceResource = 'illenium-appearance'
 
 -- Your server name (shown in Server Stats panel)
 Config.ServerName = 'My FiveM Server'
@@ -122,19 +127,23 @@ To assign a role to a player, use the Permissions panel or set it directly in th
 - Preset ban durations or custom
 
 ### Self Actions
-- God mode, noclip, invisible
-- Heal, revive, food & water
-- Super sprint, super jump
-- Set ped model, open clothing menu
-- Repair vehicle, max mods, set vehicle owner
-- Clear area (delete nearby vehicles/peds in configurable radius)
-- Delete closest NPC
-- Teleport to waypoint, copy current vector4
-- Set weather (syncs with weathersync resource if present)
-- Set time (syncs with weathersync resource if present)
-- Spawn prop
-- Send announcement with optional countdown timer
-- **Favorites bar** — right-click any self action button to pin it
+
+50 actions across seven sections, with a live filter box and a favourites bar
+(right-click any action to pin it).
+
+| Section | Actions |
+|---|---|
+| **Personal** (10) | God Mode, Heal, Revive, Food & Water, Armour Only, Infinite Stamina, Fireproof, No Ragdoll, Clear Wanted, Set Wanted |
+| **Appearance** (6) | Invisible, Ped Model, Random Ped, Revert Ped, Clothing, Walk Style |
+| **Movement** (8) | Noclip, Super Jump, Super Sprint, To Waypoint, To Coords, Save Position, Load Position, Undo Teleport |
+| **Vehicle** (10) | Spawn Vehicle, Repair, Max Mods, Take Keys, Flip Upright, Refuel, Clean, Vehicle God, Set Plate, Delete |
+| **World** (7) | Weather, Time, Freeze Time, Blackout, Announce, Traffic density, Pedestrian density |
+| **Area** (5) | Clear Area, Clear Vehicles, Clear Peds, Clear Objects, Delete Ped |
+| **Utility** (4) | Copy Vector4, Copy Vector3, Entity Info, Spawn Prop |
+
+Weather and time sync with a weathersync resource if one is running (see
+below). "Clothing" and "Revert Ped" require `Config.AppearanceResource` to
+match the appearance script you actually run.
 
 ### Entity Inspector
 - Scan nearby vehicles and NPCs within a selectable radius (50 / 100 / 150 / 250m)
@@ -195,4 +204,5 @@ If none are detected, time/weather is broadcast directly to all clients.
 
 ## License
 
-Released for free use. Do not redistribute or resell.
+Free to use on any server you own or operate, including commercial ones.
+**Do not redistribute or resell** — see [LICENSE](LICENSE) for the full terms.

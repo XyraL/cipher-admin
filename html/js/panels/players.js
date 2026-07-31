@@ -86,29 +86,36 @@ function renderPlayersTable() {
             </thead>
             <tbody>
                 ${list.map(p => {
+                    // Notes are staff-written free text and names are
+                    // player-set; both land in attributes here, so both go
+                    // through escAttr. adminColor is interpolated into a
+                    // style, so it's whitelisted to a hex literal rather than
+                    // escaped — escaping wouldn't stop a value like
+                    // "red;position:fixed;top:0" from restyling the page.
                     const notesTip = (p.notes && p.notes.length)
-                        ? ` title="${p.notes.slice(0,3).map(n => n.note).join(' | ')}"`
+                        ? ` title="${escAttr(p.notes.slice(0,3).map(n => n.note).join(' | '))}"`
                         : '';
                     const noteDot = (p.notes && p.notes.length)
-                        ? `<span class="note-dot" title="${p.notes[0].note}">&#x1F4DD;</span>` : '';
-                    return `<tr onclick="selectPlayer(${p.src})" class="${_selectedPlayer && _selectedPlayer.src === p.src ? 'selected-row' : ''}">
-                        <td class="text-muted">${p.src}</td>
+                        ? `<span class="note-dot" title="${escAttr(p.notes[0].note)}">${icon('note')}</span>` : '';
+                    const adminColor = /^#[0-9a-fA-F]{3,8}$/.test(p.adminColor || '') ? p.adminColor : 'var(--accent)';
+                    return `<tr data-ca-action="selectPlayer" data-src="${escNum(p.src)}" class="${_selectedPlayer && _selectedPlayer.src === p.src ? 'selected-row' : ''}">
+                        <td class="text-muted">${escNum(p.src)}</td>
                         <td class="td-name">
                             <div class="flex items-center gap-4"${notesTip}>
                                 <span class="status-dot online"></span>
-                                ${p.name}
+                                ${esc(p.name)}
                                 ${noteDot}
-                                ${p.isAdmin ? `<span class="badge badge-accent" style="background:${p.adminColor}22;color:${p.adminColor}">${p.adminRole}</span>` : ''}
+                                ${p.isAdmin ? `<span class="badge badge-accent" style="background:${adminColor}22;color:${adminColor}">${esc(p.adminRole)}</span>` : ''}
                             </div>
                         </td>
-                        <td class="text-muted text-sm">${p.citizenid}</td>
+                        <td class="text-muted text-sm">${esc(p.citizenid)}</td>
                         <td>
-                            <span class="badge badge-muted">${p.jobLabel || p.job || 'N/A'}</span>
+                            <span class="badge badge-muted">${esc(p.jobLabel || p.job || 'N/A')}</span>
                             ${p.onduty ? '<span class="badge badge-green" style="margin-left:4px">on duty</span>' : ''}
                         </td>
-                        <td class="text-muted text-sm">${_fmtOnlineTime(p.onlineSeconds)}</td>
-                        <td class="${pingClass(p.ping)}">${p.ping}ms</td>
-                        <td>${p.warnings > 0 ? `<span class="badge badge-amber">${p.warnings}w</span>` : '<span class="text-muted">—</span>'}</td>
+                        <td class="text-muted text-sm">${esc(_fmtOnlineTime(p.onlineSeconds))}</td>
+                        <td class="${pingClass(p.ping)}">${escNum(p.ping)}ms</td>
+                        <td>${p.warnings > 0 ? `<span class="badge badge-amber">${escNum(p.warnings)}w</span>` : '<span class="text-muted">—</span>'}</td>
                     </tr>`;
                 }).join('')}
             </tbody>
@@ -135,6 +142,23 @@ function _fmtOnlineTime(secs) {
 }
 
 // ── Player Profile ────────────────────────────────────────────────────────────
+// `kind` picks the dispatcher: 'do' runs playerAction directly, 'open' routes
+// to whichever modal that action needs (see the caAction registrations at the
+// bottom of this file).
+function _profileButtons(p, src, defs) {
+    return defs.filter((d) => d.show).map((d) => `
+        <button class="btn ${d.cls || 'btn-ghost'} btn-sm"
+            data-ca-action="playerBtn"
+            data-kind="${escAttr(d.kind)}"
+            data-act="${escAttr(d.act)}"
+            data-src="${escNum(src)}"
+            data-cid="${escAttr(p.citizenid)}"
+            data-name="${escAttr(p.name || '')}"
+            ${d.state !== undefined ? `data-state="${escAttr(d.state)}"` : ''}>
+            ${icon(d.ico)}<span>${esc(d.label)}</span>
+        </button>`).join('');
+}
+
 function renderPlayerProfile(p) {
     const ci  = p.charinfo || {};
     const job = p.job      || {};
@@ -170,13 +194,24 @@ function renderPlayerProfile(p) {
 
     const src = p.onlineSrc || p.src;
 
+    // Whitelisted to a hex literal rather than escaped: this lands inside a
+    // style attribute, where escaping alone wouldn't stop a value like
+    // "red;position:fixed;top:0" from restyling the whole panel.
+    const profileColor = /^#[0-9a-fA-F]{3,8}$/.test(p.adminColor || '') ? p.adminColor : 'var(--accent)';
+
+    // Every button below carries its target as data-* attributes and is
+    // dispatched by the delegated listener in core.js. These used to be inline
+    // onclick handlers with the player's name interpolated into a quoted JS
+    // string, which meant a name containing an apostrophe (O'Brien) broke
+    // every button on the profile, and a crafted name ran as script in the
+    // admin's own session.
     document.getElementById('player-profile-inner').innerHTML = `
         <div class="profile-header">
             <div class="profile-avatar">👤</div>
             <div>
-                <div class="profile-name">${p.name || (ci.firstname + ' ' + ci.lastname)}</div>
-                <div class="profile-cid">${p.citizenid} · ID ${src || '?'}</div>
-                ${p.isAdmin ? `<span class="badge badge-accent" style="margin-top:4px;background:${p.adminColor}22;color:${p.adminColor}">${p.adminRole}</span>` : ''}
+                <div class="profile-name">${esc(p.name || (ci.firstname + ' ' + ci.lastname))}</div>
+                <div class="profile-cid">${esc(p.citizenid)} · ID ${escNum(src)}</div>
+                ${p.isAdmin ? `<span class="badge badge-accent" style="margin-top:4px;background:${profileColor}22;color:${profileColor}">${esc(p.adminRole)}</span>` : ''}
             </div>
         </div>
 
@@ -184,22 +219,24 @@ function renderPlayerProfile(p) {
         <div class="profile-section">
             <div class="profile-section-title">Actions</div>
             <div class="profile-actions">
-                ${canGoto      ? `<button class="btn btn-ghost btn-sm" onclick="playerAction('goto',${src},'${p.citizenid}','${p.name}')">📍 Goto</button>` : ''}
-                ${canBring     ? `<button class="btn btn-ghost btn-sm" onclick="playerAction('bring',${src},'${p.citizenid}','${p.name}')">🔗 Bring</button>` : ''}
-                ${canSpectate  ? `<button class="btn btn-ghost btn-sm" onclick="playerAction('spectate',${src},'${p.citizenid}','${p.name}')">👁 Spectate</button>` : ''}
-                ${canFreeze    ? `<button class="btn btn-ghost btn-sm" onclick="playerAction('freeze',${src},'${p.citizenid}','${p.name}',{state:true})">🧊 Freeze</button>` : ''}
-                ${canFreeze    ? `<button class="btn btn-ghost btn-sm" onclick="playerAction('freeze',${src},'${p.citizenid}','${p.name}',{state:false})">🔥 Unfreeze</button>` : ''}
-                ${canRevive    ? `<button class="btn btn-ghost btn-sm" onclick="playerAction('revive',${src},'${p.citizenid}','${p.name}')">💚 Revive</button>` : ''}
-                ${canHeal      ? `<button class="btn btn-ghost btn-sm" onclick="playerAction('heal',${src},'${p.citizenid}','${p.name}')">💊 Heal</button>` : ''}
-                ${canSpawnVeh  ? `<button class="btn btn-ghost btn-sm" onclick="openSpawnOnPlayer(${src},'${p.name}')">🚗 Spawn Veh</button>` : ''}
-                ${canDelVeh    ? `<button class="btn btn-ghost btn-sm" onclick="playerAction('deletevehicle',${src},'${p.citizenid}','${p.name}')">🗑 Del Veh</button>` : ''}
-                ${canViewInv   ? `<button class="btn btn-ghost btn-sm" onclick="openPlayerInventory('${p.citizenid}','${p.name}',${src})">📦 Inventory</button>` : ''}
-                ${canScreenshot? `<button class="btn btn-ghost btn-sm" onclick="playerAction('screenshot',${src},'${p.citizenid}','${p.name}')">📷 Screenshot</button>` : ''}
-                ${canScreenshot? `<button class="btn btn-ghost btn-sm" onclick="startLiveWatch(${src},'${p.name}')">📹 Watch Live</button>` : ''}
-                ${canSlap      ? `<button class="btn btn-ghost btn-sm" onclick="playerAction('slap',${src},'${p.citizenid}','${p.name}')">👋 Slap</button>` : ''}
-                ${canResetPos  ? `<button class="btn btn-ghost btn-sm" onclick="playerAction('resetpos',${src},'${p.citizenid}','${p.name}')">📍 Reset Pos</button>` : ''}
-                ${canDm          ? `<button class="btn btn-ghost btn-sm" onclick="openDmModal(${src},'${p.citizenid}','${p.name}')">✉️ DM</button>` : ''}
-                ${canGiveWeapon  ? `<button class="btn btn-ghost btn-sm" onclick="openGiveWeaponModal(${src},'${p.citizenid}','${p.name}')">🔫 Give Weapon</button>` : ''}
+                ${_profileButtons(p, src, [
+                    { show: canGoto,       kind: 'do',   act: 'goto',          ico: 'goto',      label: 'Goto' },
+                    { show: canBring,      kind: 'do',   act: 'bring',         ico: 'bring',     label: 'Bring' },
+                    { show: canSpectate,   kind: 'do',   act: 'spectate',      ico: 'spectate',  label: 'Spectate' },
+                    { show: canFreeze,     kind: 'do',   act: 'freeze',        ico: 'freeze',    label: 'Freeze',   state: 'true' },
+                    { show: canFreeze,     kind: 'do',   act: 'freeze',        ico: 'freeze',    label: 'Unfreeze', state: 'false' },
+                    { show: canRevive,     kind: 'do',   act: 'revive',        ico: 'revive',    label: 'Revive' },
+                    { show: canHeal,       kind: 'do',   act: 'heal',          ico: 'heal',      label: 'Heal' },
+                    { show: canSpawnVeh,   kind: 'open', act: 'spawnveh',      ico: 'spawner',   label: 'Spawn Veh' },
+                    { show: canDelVeh,     kind: 'do',   act: 'deletevehicle', ico: 'trash',     label: 'Del Veh' },
+                    { show: canViewInv,    kind: 'open', act: 'inventory',     ico: 'inventory', label: 'Inventory' },
+                    { show: canScreenshot, kind: 'do',   act: 'screenshot',    ico: 'camera',    label: 'Screenshot' },
+                    { show: canScreenshot, kind: 'open', act: 'watch',         ico: 'spectate',  label: 'Watch Live' },
+                    { show: canSlap,       kind: 'do',   act: 'slap',          ico: 'warn',      label: 'Slap' },
+                    { show: canResetPos,   kind: 'do',   act: 'resetpos',      ico: 'goto',      label: 'Reset Pos' },
+                    { show: canDm,         kind: 'open', act: 'dm',            ico: 'adminchat', label: 'DM' },
+                    { show: canGiveWeapon, kind: 'open', act: 'giveweapon',    ico: 'shield',    label: 'Give Weapon' },
+                ])}
             </div>
         </div>
 
@@ -207,9 +244,11 @@ function renderPlayerProfile(p) {
         <div class="profile-section">
             <div class="profile-section-title">Moderation</div>
             <div class="profile-actions">
-                ${canWarn    ? `<button class="btn btn-amber btn-sm" onclick="openWarnModal(${src},'${p.citizenid}','${p.name}')">⚠️ Warn</button>` : ''}
-                ${canKick    ? `<button class="btn btn-ghost btn-sm" onclick="openKickModal(${src},'${p.citizenid}','${p.name}')">👢 Kick</button>` : ''}
-                ${canTempBan ? `<button class="btn btn-danger btn-sm" onclick="openBanModal(${src},'${p.citizenid}','${p.name}')">🔨 Ban</button>` : ''}
+                ${_profileButtons(p, src, [
+                    { show: canWarn,    kind: 'open', act: 'warn', ico: 'warn',  label: 'Warn', cls: 'btn-amber' },
+                    { show: canKick,    kind: 'open', act: 'kick', ico: 'kick',  label: 'Kick' },
+                    { show: canTempBan, kind: 'open', act: 'ban',  ico: 'bans',  label: 'Ban',  cls: 'btn-danger' },
+                ])}
             </div>
         </div>
 
@@ -234,8 +273,11 @@ function renderPlayerProfile(p) {
                 <span class="profile-row-label">Bank</span>
                 <span class="profile-row-value">${formatMoney(mo.bank)}</span>
             </div>
-            ${canSetCash ? `<button class="btn btn-ghost btn-sm w-full mt-8" onclick="openSetMoneyModal(${src},'${p.citizenid}','${p.name}',${mo.cash||0},${mo.bank||0})">Edit Money</button>` : ''}
-            ${canSetJob  ? `<button class="btn btn-ghost btn-sm w-full mt-8" onclick="openSetJobModal(${src},'${p.citizenid}','${p.name}')">Change Job</button>` : ''}
+            ${canSetCash ? `<button class="btn btn-ghost btn-sm w-full mt-8" data-ca-action="openSetMoney"
+                data-src="${escNum(src)}" data-cid="${escAttr(p.citizenid)}" data-name="${escAttr(p.name || '')}"
+                data-cash="${escNum(mo.cash || 0)}" data-bank="${escNum(mo.bank || 0)}">Edit Money</button>` : ''}
+            ${canSetJob  ? `<button class="btn btn-ghost btn-sm w-full mt-8" data-ca-action="openSetJob"
+                data-src="${escNum(src)}" data-cid="${escAttr(p.citizenid)}" data-name="${escAttr(p.name || '')}">Change Job</button>` : ''}
         </div>
 
         <!-- Warnings -->
@@ -243,12 +285,13 @@ function renderPlayerProfile(p) {
             <div class="profile-section-title">Warnings (${(p.warnings || []).length})</div>
             ${(p.warnings && p.warnings.length) ? p.warnings.map(w => `
                 <div class="activity-item" style="align-items:flex-start">
-                    <div class="activity-icon">⚠️</div>
+                    <div class="activity-icon">${icon('warn')}</div>
                     <div class="activity-body" style="flex:1">
-                        <div class="activity-action">${w.reason}</div>
-                        <div class="activity-detail">by ${w.admin_name} · ${formatDate(w.created_at)}</div>
+                        <div class="activity-action">${esc(w.reason)}</div>
+                        <div class="activity-detail">by ${esc(w.admin_name)} · ${esc(formatDate(w.created_at))}</div>
                     </div>
-                    ${canWarn ? `<button class="btn btn-ghost btn-xs" style="color:var(--red);flex-shrink:0" onclick="deleteWarning(${w.id},'${p.citizenid}',${src})">✕</button>` : ''}
+                    ${canWarn ? `<button class="btn btn-ghost btn-xs" style="color:var(--red);flex-shrink:0" data-ca-action="deleteWarning"
+                        data-id="${escNum(w.id)}" data-cid="${escAttr(p.citizenid)}" data-src="${escNum(src)}">${icon('close')}</button>` : ''}
                 </div>
             `).join('') : '<div class="text-muted text-sm">No warnings</div>'}
         </div>
@@ -259,21 +302,22 @@ function renderPlayerProfile(p) {
             <div class="profile-section-title">Admin Notes</div>
             ${(p.notes && p.notes.length) ? p.notes.map(n => `
                 <div class="activity-item">
-                    <div class="activity-icon">📝</div>
+                    <div class="activity-icon">${icon('note')}</div>
                     <div class="activity-body">
-                        <div class="activity-action">${n.note}</div>
-                        <div class="activity-detail">by ${n.admin_name} · ${formatDate(n.created_at)}</div>
+                        <div class="activity-action">${esc(n.note)}</div>
+                        <div class="activity-detail">by ${esc(n.admin_name)} · ${esc(formatDate(n.created_at))}</div>
                     </div>
                 </div>
             `).join('') : '<div class="text-muted text-sm">No notes</div>'}
             ${canAddNote ? `
             <div class="flex gap-4 mt-8">
-                <input class="input" id="note-input-${p.citizenid}" placeholder="Add a note...">
-                <button class="btn btn-primary btn-sm" onclick="addNote('${p.citizenid}','${p.name}')">Add</button>
+                <input class="input" id="note-input-${escAttr(p.citizenid)}" placeholder="Add a note...">
+                <button class="btn btn-primary btn-sm" data-ca-action="addNote"
+                    data-cid="${escAttr(p.citizenid)}" data-name="${escAttr(p.name || '')}">Add</button>
             </div>` : ''}
         </div>` : ''}
 
-        <button class="btn btn-ghost btn-sm w-full mt-8" onclick="closePlayerProfile()">✕ Close</button>
+        <button class="btn btn-ghost btn-sm w-full mt-8" onclick="closePlayerProfile()">${icon('close')} Close</button>
     `;
 }
 
@@ -294,7 +338,7 @@ function openKickModal(src, cid, name) {
         </div>
     `, `
         <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-        <button class="btn btn-danger" onclick="doKick(${src},'${cid}','${name}')">Kick</button>
+        <button class="btn btn-danger" data-ca-action="doKick" data-src="${escNum(src)}" data-cid="${escAttr(cid)}" data-name="${escAttr(name || '')}">Kick</button>
     `);
 }
 
@@ -323,13 +367,13 @@ function openWarnModal(src, cid, name) {
             <label>Quick reasons</label>
             <div class="flex gap-4" style="flex-wrap:wrap">
                 ${reasons.map(r =>
-                    `<button class="btn btn-ghost btn-xs" onclick="setWarnReason('${r.replace(/'/g,"\\'")}'">${r}</button>`
+                    `<button class="btn btn-ghost btn-xs" data-ca-action="setWarnReason" data-reason="${escAttr(r)}">${esc(r)}</button>`
                 ).join('')}
             </div>
         </div>
     `, `
         <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-        <button class="btn btn-amber" onclick="doWarn(${src},'${cid}','${name}')">Warn</button>
+        <button class="btn btn-amber" data-ca-action="doWarn" data-src="${escNum(src)}" data-cid="${escAttr(cid)}" data-name="${escAttr(name || '')}">Warn</button>
     `);
 }
 
@@ -364,13 +408,13 @@ function openBanModal(src, cid, name) {
             <label>Quick reasons</label>
             <div class="flex gap-4" style="flex-wrap:wrap">
                 ${reasons.map(r =>
-                    `<button class="btn btn-ghost btn-xs" onclick="setBanReason('${r.replace(/'/g,"\\'")}'">${r}</button>`
+                    `<button class="btn btn-ghost btn-xs" data-ca-action="setBanReason" data-reason="${escAttr(r)}">${esc(r)}</button>`
                 ).join('')}
             </div>
         </div>
     `, `
         <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-        <button class="btn btn-danger" onclick="doBan(${src},'${cid}','${name}')">Ban</button>
+        <button class="btn btn-danger" data-ca-action="doBan" data-src="${escNum(src)}" data-cid="${escAttr(cid)}" data-name="${escAttr(name || '')}">Ban</button>
     `);
 }
 
@@ -400,7 +444,7 @@ function openSetMoneyModal(src, cid, name, cash, bank) {
         </div>
     `, `
         <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-        <button class="btn btn-primary" onclick="doSetMoney(${src},'${cid}','${name}')">Save</button>
+        <button class="btn btn-primary" data-ca-action="doSetMoney" data-src="${escNum(src)}" data-cid="${escAttr(cid)}" data-name="${escAttr(name || '')}">Save</button>
     `);
 }
 
@@ -428,7 +472,7 @@ function openSetJobModal(src, cid, name) {
         </div>
     `, `
         <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-        <button class="btn btn-primary" onclick="doSetJob(${src},'${cid}','${name}')">Save</button>
+        <button class="btn btn-primary" data-ca-action="doSetJob" data-src="${escNum(src)}" data-cid="${escAttr(cid)}" data-name="${escAttr(name || '')}">Save</button>
     `);
 }
 
@@ -515,6 +559,52 @@ function openSpawnOnPlayer(src, name) {
     window._spawnTargetName = name;
 }
 
+// Single dispatch point for every profile button. Values arrive as strings
+// off the dataset, so anything numeric is converted here rather than at each
+// call site.
+caAction('selectPlayer', (d) => selectPlayer(Number(d.src)));
+
+// These two were emitting onclick="setWarnReason('Spamming'" — the closing
+// paren was missing from the template, so the attribute was a JS syntax error
+// and every quick-reason preset in the Warn and Ban modals silently did
+// nothing. Exactly the kind of defect that hides inside string-built handlers.
+caAction('setWarnReason', (d) => setWarnReason(d.reason));
+caAction('setBanReason',  (d) => setBanReason(d.reason));
+
+caAction('doKick',       (d) => doKick(Number(d.src), d.cid, d.name));
+caAction('doWarn',       (d) => doWarn(Number(d.src), d.cid, d.name));
+caAction('doBan',        (d) => doBan(Number(d.src), d.cid, d.name));
+caAction('doSetMoney',   (d) => doSetMoney(Number(d.src), d.cid, d.name));
+caAction('doSetJob',     (d) => doSetJob(Number(d.src), d.cid, d.name));
+caAction('addNote',      (d) => addNote(d.cid, d.name));
+caAction('deleteWarning',(d) => deleteWarning(Number(d.id), d.cid, Number(d.src)));
+caAction('openSetMoney', (d) => openSetMoneyModal(Number(d.src), d.cid, d.name, Number(d.cash), Number(d.bank)));
+caAction('openSetJob',   (d) => openSetJobModal(Number(d.src), d.cid, d.name));
+
+caAction('playerBtn', (d) => {
+    const src = Number(d.src);
+    const cid = d.cid;
+    const name = d.name;
+
+    if (d.kind === 'do') {
+        const extra = d.state !== undefined ? { state: d.state === 'true' } : {};
+        playerAction(d.act, src, cid, name, extra);
+        return;
+    }
+
+    switch (d.act) {
+        case 'spawnveh':   openSpawnOnPlayer(src, name); break;
+        case 'inventory':  openPlayerInventory(cid, name, src); break;
+        case 'watch':      startLiveWatch(src, name); break;
+        case 'dm':         openDmModal(src, cid, name); break;
+        case 'giveweapon': openGiveWeaponModal(src, cid, name); break;
+        case 'warn':       openWarnModal(src, cid, name); break;
+        case 'kick':       openKickModal(src, cid, name); break;
+        case 'ban':        openBanModal(src, cid, name); break;
+    }
+});
+
+window._profileButtons     = _profileButtons;
 window.loadPlayers         = loadPlayers;
 window.filterPlayers       = filterPlayers;
 window.sortPlayers         = sortPlayers;

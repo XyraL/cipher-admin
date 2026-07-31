@@ -4,6 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cipher-Admin</title>
+    <!--
+      Fonts are loaded from Google. FiveM's CEF has network access, so this
+      works on any client with a connection — but a client without one falls
+      back to the system stack in the CSS variables rather than failing.
+      To make it fully offline, download the woff2 files into html/fonts/,
+      swap this for @font-face rules, and add them to fxmanifest files{}.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Saira:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -21,66 +31,66 @@
 
         <ul id="admin-nav">
             <li class="nav-item active" data-panel="dashboard">
-                <span class="nav-icon">&#x25C8;</span>
+                <span class="nav-icon" data-icon="dashboard"></span>
                 <span class="nav-label">Dashboard</span>
             </li>
             <li class="nav-item" data-panel="players">
-                <span class="nav-icon">&#x25C9;</span>
+                <span class="nav-icon" data-icon="players"></span>
                 <span class="nav-label">Players</span>
                 <span class="nav-badge" id="badge-players"></span>
             </li>
             <li class="nav-item" data-panel="character">
-                <span class="nav-icon">&#x25CE;</span>
+                <span class="nav-icon" data-icon="character"></span>
                 <span class="nav-label">Character Lookup</span>
             </li>
             <li class="nav-divider"></li>
             <li class="nav-item" data-panel="spawner">
-                <span class="nav-icon">&#x2B21;</span>
+                <span class="nav-icon" data-icon="spawner"></span>
                 <span class="nav-label">Vehicle Spawner</span>
             </li>
             <li class="nav-item" data-panel="inventory">
-                <span class="nav-icon">&#x25A6;</span>
+                <span class="nav-icon" data-icon="inventory"></span>
                 <span class="nav-label">Inventory Viewer</span>
             </li>
             <li class="nav-divider"></li>
             <li class="nav-item" data-panel="bans">
-                <span class="nav-icon">&#x2298;</span>
+                <span class="nav-icon" data-icon="bans"></span>
                 <span class="nav-label">Ban Manager</span>
                 <span class="nav-badge danger" id="badge-bans"></span>
             </li>
             <li class="nav-item" data-panel="permissions">
-                <span class="nav-icon">&#x2B14;</span>
+                <span class="nav-icon" data-icon="permissions"></span>
                 <span class="nav-label">Permissions</span>
             </li>
             <li class="nav-item" data-panel="audit">
-                <span class="nav-icon">&#x2261;</span>
+                <span class="nav-icon" data-icon="audit"></span>
                 <span class="nav-label">Audit Log</span>
             </li>
             <li class="nav-divider"></li>
             <li class="nav-item" data-panel="reports">
-                <span class="nav-icon">&#x1F4CB;</span>
+                <span class="nav-icon" data-icon="reports"></span>
                 <span class="nav-label">Reports</span>
                 <span class="nav-badge danger" id="badge-reports"></span>
             </li>
             <li class="nav-item" data-panel="resources">
-                <span class="nav-icon">&#x25A6;</span>
+                <span class="nav-icon" data-icon="resources"></span>
                 <span class="nav-label">Resources</span>
             </li>
             <li class="nav-item" data-panel="entities">
-                <span class="nav-icon">&#x1F310;</span>
+                <span class="nav-icon" data-icon="entities"></span>
                 <span class="nav-label">Entities</span>
             </li>
             <li class="nav-item" data-panel="stats">
-                <span class="nav-icon">&#x1F4CA;</span>
+                <span class="nav-icon" data-icon="stats"></span>
                 <span class="nav-label">Server Stats</span>
             </li>
             <li class="nav-divider"></li>
             <li class="nav-item" data-panel="self">
-                <span class="nav-icon">&#x2605;</span>
+                <span class="nav-icon" data-icon="self"></span>
                 <span class="nav-label">Self Actions</span>
             </li>
             <li class="nav-item" data-panel="adminchat">
-                <span class="nav-icon">&#x25A1;</span>
+                <span class="nav-icon" data-icon="adminchat"></span>
                 <span class="nav-label">Admin Chat</span>
                 <span class="nav-badge" id="badge-adminchat"></span>
             </li>
@@ -117,67 +127,7 @@
             <div id="panel-stats"       class="panel"></div>
 
             <!-- ── Self Actions ── -->
-            <div id="panel-self" class="panel">
-                <div class="section-header mb-12">
-                    <div>
-                        <div class="section-title">Self Actions</div>
-                        <div class="section-sub">Quick commands targeting yourself &mdash; right-click to pin</div>
-                    </div>
-                </div>
-
-                <!-- Favorites bar -->
-                <div id="sa-favorites-wrap" style="display:none">
-                    <div class="self-section-title">&#x2605; Favorites</div>
-                    <div class="self-action-grid" id="sa-favorites-grid"></div>
-                </div>
-
-                <div class="self-section-title">Personal</div>
-                <div class="self-action-grid">
-                    <button class="self-action-card" id="sa-godmode"   onclick="selfBtn('godmode')"   oncontextmenu="selfToggleFav('godmode','God Mode','&#x1F6E1;',event)">  <div class="sa-icon">&#x1F6E1;</div><div class="sa-label">God Mode</div>      <div class="sa-desc">Toggle invincibility</div></button>
-                    <button class="self-action-card" id="sa-heal"      onclick="selfBtn('heal')"      oncontextmenu="selfToggleFav('heal','Heal','&#x2764;',event)">           <div class="sa-icon">&#x2764;</div>  <div class="sa-label">Heal</div>           <div class="sa-desc">Full health &amp; armour</div></button>
-                    <button class="self-action-card" id="sa-revive"    onclick="selfBtn('revive')"    oncontextmenu="selfToggleFav('revive','Revive','&#x1F48A;',event)">      <div class="sa-icon">&#x1F48A;</div> <div class="sa-label">Revive</div>         <div class="sa-desc">Resurrect if dead</div></button>
-                    <button class="self-action-card" id="sa-foodwater" onclick="selfBtn('foodwater')" oncontextmenu="selfToggleFav('foodwater','Food + Water','&#x1F354;',event)"><div class="sa-icon">&#x1F354;</div><div class="sa-label">Food &amp; Water</div><div class="sa-desc">Max hunger &amp; thirst</div></button>
-                </div>
-
-                <div class="self-section-title">Appearance</div>
-                <div class="self-action-grid">
-                    <button class="self-action-card" id="sa-invisible" onclick="selfBtn('invisible')" oncontextmenu="selfToggleFav('invisible','Invisible','&#x1F441;',event)"><div class="sa-icon">&#x1F441;</div><div class="sa-label">Invisible</div>    <div class="sa-desc">Toggle visibility</div></button>
-                    <button class="self-action-card" id="sa-pedmodel"  onclick="selfBtn('pedmodel')"  oncontextmenu="selfToggleFav('pedmodel','Ped Model','&#x1F9CD;',event)"> <div class="sa-icon">&#x1F9CD;</div><div class="sa-label">Ped Model</div>    <div class="sa-desc">Change your character</div></button>
-                    <button class="self-action-card" id="sa-clothing"  onclick="selfBtn('clothing')"  oncontextmenu="selfToggleFav('clothing','Clothing','&#x1F455;',event)">  <div class="sa-icon">&#x1F455;</div><div class="sa-label">Clothing</div>     <div class="sa-desc">Open appearance editor</div></button>
-                </div>
-
-                <div class="self-section-title">Movement</div>
-                <div class="self-action-grid">
-                    <button class="self-action-card" id="sa-noclip"      onclick="selfBtn('noclip')"      oncontextmenu="selfToggleFav('noclip','Noclip','&#x1F47B;',event)">         <div class="sa-icon">&#x1F47B;</div><div class="sa-label">Noclip</div>        <div class="sa-desc">Fly &amp; invisible to others</div></button>
-                    <button class="self-action-card" id="sa-supersprint" onclick="selfBtn('supersprint')" oncontextmenu="selfToggleFav('supersprint','Super Sprint','&#x26A1;',event)"><div class="sa-icon">&#x26A1;</div>   <div class="sa-label">Super Sprint</div> <div class="sa-desc">2.5x run speed</div></button>
-                    <button class="self-action-card" id="sa-superjump"   onclick="selfBtn('superjump')"   oncontextmenu="selfToggleFav('superjump','Super Jump','&#x1F98A;',event)">   <div class="sa-icon">&#x1F98A;</div> <div class="sa-label">Super Jump</div>   <div class="sa-desc">Jump extremely high</div></button>
-                    <button class="self-action-card" id="sa-waypoint"    onclick="selfBtn('waypoint')"    oncontextmenu="selfToggleFav('waypoint','Waypoint TP','&#x1F4CD;',event)">   <div class="sa-icon">&#x1F4CD;</div> <div class="sa-label">Waypoint TP</div>  <div class="sa-desc">Teleport to map marker</div></button>
-                    <button class="self-action-card" id="sa-copyvec"     onclick="selfBtn('copyvec')"     oncontextmenu="selfToggleFav('copyvec','Copy Vector','&#x1F4CB;',event)">    <div class="sa-icon">&#x1F4CB;</div> <div class="sa-label">Copy Vector</div>  <div class="sa-desc">Copy current coords</div></button>
-                </div>
-
-                <div class="self-section-title">Vehicle</div>
-                <div class="self-action-grid">
-                    <button class="self-action-card" id="sa-spawner"   onclick="selfBtn('spawner')"   oncontextmenu="selfToggleFav('spawner','Spawn Veh','&#x1F697;',event)">  <div class="sa-icon">&#x1F697;</div><div class="sa-label">Spawn Vehicle</div><div class="sa-desc">Open vehicle spawner</div></button>
-                    <button class="self-action-card" id="sa-deleteveh" onclick="selfBtn('deleteveh')" oncontextmenu="selfToggleFav('deleteveh','Delete Veh','&#x1F5D1;',event)"><div class="sa-icon">&#x1F5D1;</div><div class="sa-label">Delete Veh</div>  <div class="sa-desc">Delete nearest vehicle</div></button>
-                    <button class="self-action-card" id="sa-repairveh" onclick="selfBtn('repairveh')" oncontextmenu="selfToggleFav('repairveh','Repair Veh','&#x1F527;',event)"><div class="sa-icon">&#x1F527;</div><div class="sa-label">Repair Veh</div>  <div class="sa-desc">Fix current vehicle</div></button>
-                    <button class="self-action-card" id="sa-maxmods"   onclick="selfBtn('maxmods')"   oncontextmenu="selfToggleFav('maxmods','Max Mods','&#x1F4A8;',event)">   <div class="sa-icon">&#x1F4A8;</div><div class="sa-label">Max Mods</div>     <div class="sa-desc">Apply all upgrades</div></button>
-                    <button class="self-action-card" id="sa-setowner"  onclick="selfBtn('setowner')"  oncontextmenu="selfToggleFav('setowner','Set Owner','&#x1F511;',event)"> <div class="sa-icon">&#x1F511;</div><div class="sa-label">Set Owner</div>   <div class="sa-desc">Register nearest vehicle</div></button>
-                </div>
-
-                <div class="self-section-title">Area</div>
-                <div class="self-action-grid">
-                    <button class="self-action-card" id="sa-cleararea" onclick="selfBtn('cleararea')" oncontextmenu="selfToggleFav('cleararea','Clear Area','&#x1F4A5;',event)"><div class="sa-icon">&#x1F4A5;</div><div class="sa-label">Clear Area</div>   <div class="sa-desc">Delete nearby vehicles &amp; NPCs</div></button>
-                    <button class="self-action-card" id="sa-deleteped" onclick="selfBtn('deleteped')" oncontextmenu="selfToggleFav('deleteped','Delete Ped','&#x1F9DF;',event)"><div class="sa-icon">&#x1F9DF;</div><div class="sa-label">Delete Ped</div>   <div class="sa-desc">Delete closest NPC</div></button>
-                </div>
-
-                <div class="self-section-title">World</div>
-                <div class="self-action-grid">
-                    <button class="self-action-card" id="sa-spawnprop" onclick="selfBtn('spawnprop')" oncontextmenu="selfToggleFav('spawnprop','Spawn Prop','&#x1F4E6;',event)"><div class="sa-icon">&#x1F4E6;</div><div class="sa-label">Spawn Prop</div>  <div class="sa-desc">Spawn an object</div></button>
-                    <button class="self-action-card" id="sa-announce"  onclick="selfBtn('announce')"  oncontextmenu="selfToggleFav('announce','Announce','&#x1F4E2;',event)">  <div class="sa-icon">&#x1F4E2;</div><div class="sa-label">Announce</div>    <div class="sa-desc">Send server message</div></button>
-                    <button class="self-action-card" id="sa-weather"   onclick="selfBtn('weather')"   oncontextmenu="selfToggleFav('weather','Set Weather','&#x26C5;',event)">  <div class="sa-icon">&#x26C5;</div> <div class="sa-label">Set Weather</div> <div class="sa-desc">Change server weather</div></button>
-                    <button class="self-action-card" id="sa-settime"   onclick="selfBtn('settime')"   oncontextmenu="selfToggleFav('settime','Set Time','&#x1F550;',event)">    <div class="sa-icon">&#x1F550;</div><div class="sa-label">Set Time</div>    <div class="sa-desc">Change server time</div></button>
-                </div>
-            </div>
+            <div id="panel-self" class="panel"></div>
 
             <!-- ── Admin Chat ── -->
             <div id="panel-adminchat" class="panel">
@@ -227,6 +177,8 @@
     </div>
 </div>
 
+<!-- core.js first: defines esc/icon/caAction, which app.js and every panel use. -->
+<script src="js/core.js"></script>
 <script src="js/app.js"></script>
 <script src="js/panels/dashboard.js"></script>
 <script src="js/panels/players.js"></script>

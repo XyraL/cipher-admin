@@ -175,6 +175,7 @@ function switchPanel(name) {
         if (rb) rb.textContent = '';
         if (typeof loadReports === 'function') loadReports();
     }
+    if (name === 'self')        { if (typeof renderSelfPanel === 'function') renderSelfPanel(); }
     if (name === 'resources')   { if (typeof loadResources === 'function') loadResources(); }
     if (name === 'entities')    { if (typeof loadEntities  === 'function') loadEntities(); }
     if (name === 'stats')       { if (typeof loadStats     === 'function') loadStats(); }

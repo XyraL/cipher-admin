@@ -88,9 +88,9 @@ function renderRolePermissions() {
             ${_roles.map(role => `
                 <div class="perm-role-card">
                     <div class="perm-role-header">
-                        <div class="perm-role-dot" style="background:${role.color}"></div>
-                        <span class="perm-role-label" style="color:${role.color}">${role.label}</span>
-                        <button class="btn btn-primary btn-xs" style="margin-left:auto" onclick="saveRolePermissions('${role.name}')">Save</button>
+                        <div class="perm-role-dot" style="background:${_safeColor(role.color)}"></div>
+                        <span class="perm-role-label" style="color:${_safeColor(role.color)}">${esc(role.label)}</span>
+                        <button class="btn btn-primary btn-xs" style="margin-left:auto" data-ca-action="saveRolePerms" data-role="${escAttr(role.name)}">Save</button>
                     </div>
                     <div class="perm-list">
                         ${ALL_PERMS.map(p => `
@@ -156,11 +156,11 @@ function renderStaffList() {
                         <tbody>
                             ${_staffList.map(s => `
                                 <tr>
-                                    <td class="td-name">${s.player_name}</td>
-                                    <td><span class="badge" style="background:${s.role_color}22;color:${s.role_color}">${s.role_label || s.role}</span></td>
-                                    <td class="text-muted">${s.assigned_by}</td>
-                                    <td class="text-muted text-sm">${formatDate(s.created_at)}</td>
-                                    <td><button class="btn btn-danger btn-xs" onclick="removeStaffRole('${s.citizenid}','${s.player_name}')">Remove</button></td>
+                                    <td class="td-name">${esc(s.player_name)}</td>
+                                    <td><span class="badge" style="background:${_safeColor(s.role_color)}22;color:${_safeColor(s.role_color)}">${esc(s.role_label || s.role)}</span></td>
+                                    <td class="text-muted">${esc(s.assigned_by)}</td>
+                                    <td class="text-muted text-sm">${esc(formatDate(s.created_at))}</td>
+                                    <td><button class="btn btn-danger btn-xs" data-ca-action="removeStaffRole" data-cid="${escAttr(s.citizenid)}" data-name="${escAttr(s.player_name || '')}">Remove</button></td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -170,6 +170,17 @@ function renderStaffList() {
         </div>
     `;
 }
+
+// Role colours come from config and land inside style attributes, where
+// escaping alone wouldn't stop a value like "red;position:fixed" from
+// restyling the panel — so they're whitelisted to a hex literal instead.
+function _safeColor(c) {
+    return /^#[0-9a-fA-F]{3,8}$/.test(c || '') ? c : 'var(--accent)';
+}
+
+caAction('saveRolePerms',  (d) => saveRolePermissions(d.role));
+caAction('removeStaffRole', (d) => removeStaffRole(d.cid, d.name));
+caAction('assignRole',     (d) => assignRole(d.cid, d.name));
 
 async function searchStaffPlayer() {
     const q = document.getElementById('staff-search')?.value?.trim();
@@ -184,11 +195,12 @@ async function searchStaffPlayer() {
     const roles = _roles.length ? _roles : await caFetch('cipher-admin:server:getRoles', {}) || [];
     el.innerHTML = results.map(p => `
         <div class="flex items-center gap-8 mb-8">
-            <span class="flex-1 font-bold">${p.firstname} ${p.lastname} <span class="text-muted text-sm">${p.citizenid}</span></span>
-            <select class="select" style="width:130px" id="assign-role-${p.citizenid}">
-                ${roles.map(r => `<option value="${r.name}" style="color:${r.color}">${r.label}</option>`).join('')}
+            <span class="flex-1 font-bold">${esc(p.firstname)} ${esc(p.lastname)} <span class="text-muted text-sm">${esc(p.citizenid)}</span></span>
+            <select class="select" style="width:130px" id="assign-role-${escAttr(p.citizenid)}">
+                ${roles.map(r => `<option value="${escAttr(r.name)}" style="color:${_safeColor(r.color)}">${esc(r.label)}</option>`).join('')}
             </select>
-            <button class="btn btn-primary btn-sm" onclick="assignRole('${p.citizenid}','${p.firstname} ${p.lastname}')">Assign</button>
+            <button class="btn btn-primary btn-sm" data-ca-action="assignRole"
+                data-cid="${escAttr(p.citizenid)}" data-name="${escAttr(p.firstname + ' ' + p.lastname)}">Assign</button>
         </div>
     `).join('');
 }

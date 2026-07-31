@@ -1,6 +1,5 @@
 -- Cipher-Admin Server — Player Reports
 
-local QBX           = exports['qbx_core']
 local IsAdmin       = function(src) return exports['cipher-admin']:IsAdmin(src) end
 local HasPermission = function(src, p) return exports['cipher-admin']:HasPermission(src, p) end
 local GetAdminCache = function(src) return exports['cipher-admin']:GetAdminCache(src) end
@@ -14,7 +13,7 @@ AddEventHandler('cipher-admin:server:submitReport', function(message, isReply)
         TriggerClientEvent('ox_lib:notify', src, { title = 'Report', description = 'Message is too short.', type = 'error' })
         return
     end
-    local p = QBX:GetPlayer(src)
+    local p = Framework.GetPlayer(src)
     if not p then return end
     local name = p.PlayerData.charinfo.firstname .. ' ' .. p.PlayerData.charinfo.lastname
     local cid  = p.PlayerData.citizenid
@@ -90,7 +89,7 @@ lib.callback.register('cipher-admin:server:respondReport', function(src, data)
     -- Notify player if online (client/reports.lua handles the display + /reply hint)
     for _, psrc in ipairs(GetPlayers()) do
         local pid = tonumber(psrc)
-        local pp  = QBX:GetPlayer(pid)
+        local pp  = Framework.GetPlayer(pid)
         if pp and pp.PlayerData.citizenid == data.citizenid then
             TriggerClientEvent('cipher-admin:client:reportResponse', pid, { admin = from, response = data.response })
             break

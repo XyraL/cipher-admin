@@ -1,40 +1,226 @@
 /* ── Reset ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* ── Design Tokens ── */
+/* ── Design Tokens ──
+   "Command deck": neutral graphite with a red authority accent. Deliberately
+   unlike every other Cipher script — trucking is amber/teal industrial, the
+   drugs ops console is graphite/cyan — because staff tooling should never be
+   mistakable for player tooling at a glance.
+
+   The base was previously blue-tinted slate (#07090f / #111827 / #1a2236).
+   It's now neutral, so red reads as the only chromatic signal on screen
+   instead of competing with a blue cast.
+
+   ── On red being both accent and danger ──
+   Hue alone can't separate them here, so they're separated by WEIGHT:
+   accents are thin bars, subtle tints and outlines; destructive actions get
+   solid fills and full-strength borders. A filled red button always means
+   "this destroys something"; a red hairline never does. */
 :root {
-    --bg-base:      #07090f;
-    --bg-card:      #0d1117;
-    --bg-panel:     #111827;
-    --bg-elevated:  #1a2236;
-    --bg-input:     #0d1117;
-    --border:       rgba(255,255,255,0.06);
-    --border-light: rgba(255,255,255,0.10);
-    --accent:       #6366f1;
-    --accent-dim:   rgba(99,102,241,0.15);
-    --accent-glow:  rgba(99,102,241,0.3);
-    --amber:        #f59e0b;
-    --amber-dim:    rgba(245,158,11,0.15);
-    --red:          #ef4444;
-    --red-dim:      rgba(239,68,68,0.15);
-    --green:        #10b981;
-    --green-dim:    rgba(16,185,129,0.15);
-    --blue:         #3b82f6;
-    --blue-dim:     rgba(59,130,246,0.15);
-    --text-primary: #f1f5f9;
-    --text-secondary: #94a3b8;
-    --text-muted:   #475569;
+    --bg-base:      #0b0c0e;
+    --bg-card:      #121316;
+    --bg-panel:     #17181c;
+    --bg-elevated:  #1e2025;
+    --bg-input:     #0e0f12;
+    --border:       rgba(255,255,255,0.07);
+    --border-light: rgba(255,255,255,0.12);
+
+    /* Brand / chrome. Used for nav state, focus rings, headings. */
+    --accent:       #e5484d;
+    --accent-dim:   rgba(229,72,77,0.14);
+    --accent-glow:  rgba(229,72,77,0.35);
+
+    /* Semantic status colours — kept distinct from the accent so "online"
+       and "warning" still mean what they always meant. */
+    --amber:        #f5a524;
+    --amber-dim:    rgba(245,165,36,0.15);
+    --red:          #ff5a5f;
+    --red-dim:      rgba(255,90,95,0.16);
+    --green:        #30d158;
+    --green-dim:    rgba(48,209,88,0.15);
+    --blue:         #4c9aff;
+    --blue-dim:     rgba(76,154,255,0.15);
+
+    --text-primary: #f2f3f5;
+    --text-secondary: #9aa0a8;
+    --text-muted:   #5c626b;
+
+    --font-display: 'Saira', 'Segoe UI', system-ui, sans-serif;
+    --font-body:    'Inter', 'Segoe UI', system-ui, sans-serif;
+    --font-mono:    'JetBrains Mono', ui-monospace, 'Cascadia Code', monospace;
+
     --sidebar-w:    220px;
     --topbar-h:     52px;
     --radius:       8px;
     --radius-sm:    5px;
 }
 
+/* Display face for anything that names a thing: headings, titles, the logo,
+   nav labels. Body copy and long text stay on Inter for readability. */
+.section-title, .panel-title, #topbar-title, .logo-text,
+.self-section-title, .profile-name, .card-title, .stat-value, .modal-title {
+    font-family: var(--font-display);
+    letter-spacing: 0.2px;
+}
+
+/* Numbers, ids, coordinates, plates, timestamps — anything that benefits
+   from fixed advance width. */
+.text-mono, .profile-cid, .stat-number, .sa-state,
+.leaderboard-meta, td.text-sm, .badge {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Icons ──
+   Inline SVGs need an explicit box: with no width/height they fall back to
+   the 300x150 replaced-element default and swallow whatever contains them.
+   flex-shrink:0 stops them being squashed when a label wraps beside them. */
+.ca-icon {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    display: inline-block;
+    vertical-align: -2px;
+}
+
+/* Buttons put the icon and its label on a shared baseline with one gap rule,
+   rather than each button template managing its own spacing. */
+.btn { display: inline-flex; align-items: center; gap: 6px; }
+.btn .ca-icon { width: 14px; height: 14px; }
+.btn-xs .ca-icon, .btn-sm .ca-icon { width: 13px; height: 13px; }
+
+.nav-icon { display: inline-flex; align-items: center; justify-content: center; }
+.nav-icon .ca-icon { width: 16px; height: 16px; }
+
+/* Activity rows use a slightly larger icon as a leading visual anchor. */
+.activity-icon .ca-icon { width: 16px; height: 16px; }
+.note-dot .ca-icon { width: 12px; height: 12px; vertical-align: -1px; }
+
+/* ── Command-deck chrome ──
+   Layered above the base rules so these override the originals regardless of
+   where those sit in the file. */
+
+/* Sidebar sits above the wrapper's gradient/scanline pseudo-elements. */
+#admin-sidebar, #admin-main { position: relative; z-index: 1; }
+
+/* Active nav gets a solid accent bar on its leading edge — the "you are here"
+   marker is structural, not just a background tint. */
+#admin-nav .nav-item {
+    position: relative;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    transition: background .12s, color .12s;
+}
+#admin-nav .nav-item::before {
+    content: '';
+    position: absolute; left: 0; top: 6px; bottom: 6px;
+    width: 2px; border-radius: 0 2px 2px 0;
+    background: transparent;
+    transition: background .12s;
+}
+#admin-nav .nav-item.active::before { background: var(--accent); }
+#admin-nav .nav-item.active {
+    background: var(--accent-dim);
+    color: var(--text-primary);
+}
+#admin-nav .nav-item.active .ca-icon { color: var(--accent); }
+
+/* Uppercase mono section labels — the "systems console" cue. */
+.self-section-title, .section-sub, .profile-section-title {
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 1.1px;
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+/* Topbar reads as a status strip rather than a page header. */
+#admin-topbar {
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--bg-panel), var(--bg-base));
+}
+#topbar-title { text-transform: uppercase; letter-spacing: 1.4px; font-size: 12px; }
+#topbar-right { font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); }
+
+/* Live status LED next to the server name, mirroring the drugs ops console. */
+#sidebar-server-name::before {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+/* Logo mark picks up the accent so the brand and the system colour agree. */
+.logo-mark { color: var(--accent); }
+.logo-text span { color: var(--accent); }
+
+/* Destructive = FILLED. This is the whole basis for telling danger apart from
+   the accent, since they share a hue — see the token block for the reasoning. */
+.btn-danger {
+    background: var(--red);
+    border-color: var(--red);
+    color: #14090a;
+    font-weight: 600;
+}
+.btn-danger:hover { filter: brightness(1.1); }
+
+/* Accent buttons stay outline-weight so they never read as destructive. */
+.btn-primary {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.btn-primary:hover { background: var(--accent-glow); color: var(--text-primary); }
+
+/* Focus is visible and accent-coloured — this panel gets driven quickly. */
+.input:focus, .select:focus, .btn:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-dim);
+}
+
+/* ── Self action cards (extended) ── */
+.self-section { margin-bottom: 4px; }
+
+/* Toggle cards carry their state as a corner pill so ON/OFF is readable
+   without relying on the active border alone. */
+.sa-state {
+    position: absolute; top: 8px; right: 8px;
+    font-size: 9px; font-weight: 700; letter-spacing: .6px;
+    padding: 2px 6px; border-radius: 3px;
+    background: rgba(255,255,255,0.06);
+    color: var(--text-muted);
+}
+.self-action-card { position: relative; }
+.self-action-card.active .sa-state {
+    background: var(--accent-dim);
+    color: var(--accent);
+}
+
+/* Destructive actions are tinted at rest, not just on hover — these delete
+   things and shouldn't look identical to Heal. */
+/* These cards are <button>s, so they inherit the UA's default black button
+   text. The old emoji icons ignored `color` entirely, which hid it — the SVGs
+   stroke with currentColor and rendered black-on-black. Set it explicitly. */
+.self-action-card .sa-icon { color: var(--text-secondary); }
+.self-action-card:hover .sa-icon { color: var(--text-primary); }
+.self-action-card.active .sa-icon { color: var(--accent); }
+
+.self-action-card.danger .sa-icon { color: var(--red); }
+.self-action-card.danger:hover {
+    border-color: var(--red);
+    background: var(--red-dim);
+}
+
+.self-action-card .sa-icon .ca-icon { width: 20px; height: 20px; }
+
 /* ── Base ── */
 html, body {
     width: 100%; height: 100%;
     background: transparent;
-    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-body);
     font-size: 13px;
     color: var(--text-primary);
     overflow: hidden;
@@ -62,6 +248,7 @@ html, body {
 
 /* ── Admin Wrapper (the actual panel) ── */
 #admin-wrapper {
+    position: relative;
     width: 80vw;
     max-width: 1360px;
     display: flex;
@@ -69,6 +256,30 @@ html, body {
     background: var(--bg-base);
     box-shadow: -8px 0 60px rgba(0,0,0,0.8);
     animation: slideInRight 0.22s cubic-bezier(0.16,1,0.3,1);
+    /* A single lit edge where the drawer meets the game. Reads as a panel
+       that has been slid open rather than a page that happens to be there. */
+    border-left: 1px solid var(--accent);
+}
+
+/* Faint scanlines, matching the treatment in `cipher` and cipher-trucking so
+   the suite shares a texture even where the palettes differ. Non-interactive
+   and very low contrast — it should register as screen grain, not stripes. */
+#admin-wrapper::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,0,0,0.13) 2px 4px);
+    pointer-events: none;
+    z-index: 50;
+}
+
+/* Accent wash bleeding in from the leading edge, so the eye starts at the
+   sidebar rather than in the middle of the content area. */
+#admin-wrapper::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(60% 50% at 0% 0%, var(--accent-dim), transparent 60%);
+    pointer-events: none;
+    z-index: 0;
 }
 
 @keyframes slideInRight {

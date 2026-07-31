@@ -2,6 +2,10 @@
 
 let _banFilter = 'active';
 
+// Last rendered ban list, kept so row handlers can look a record up by id
+// instead of round-tripping its fields through HTML attributes.
+let _lastBans = [];
+
 async function loadBans() {
     const panel = document.getElementById('panel-bans');
     panel.innerHTML = `
@@ -46,6 +50,7 @@ function setBanFilter(val) {
 function searchBans(q) { fetchBans(q); }
 
 function renderBansTable(bans) {
+    _lastBans = bans || [];
     const wrap = document.getElementById('bans-table-wrap');
     if (!wrap) return;
     if (!bans.length) {
@@ -67,15 +72,15 @@ function renderBansTable(bans) {
             </thead>
             <tbody>
                 ${bans.map(b => `
-                    <tr class="ban-row" onclick="viewBan(${b.id},'${(b.player_name||'').replace(/'/g,"\\'")}','${(b.reason||'').replace(/'/g,"\\'")}','${b.admin_name||''}','${b.is_permanent?'Permanent':b.expires_at||'N/A'}','${b.citizenid||''}')">
-                        <td class="td-name">${b.player_name}</td>
-                        <td class="text-muted truncate" style="max-width:200px">${b.reason}</td>
-                        <td class="text-muted">${b.admin_name}</td>
-                        <td>${b.is_permanent ? '<span class="badge badge-red">Permanent</span>' : (b.expires_at ? formatDate(b.expires_at) : 'N/A')}</td>
+                    <tr class="ban-row" data-ca-action="viewBan" data-id="${escNum(b.id)}">
+                        <td class="td-name">${esc(b.player_name)}</td>
+                        <td class="text-muted truncate" style="max-width:200px">${esc(b.reason)}</td>
+                        <td class="text-muted">${esc(b.admin_name)}</td>
+                        <td>${b.is_permanent ? '<span class="badge badge-red">Permanent</span>' : (b.expires_at ? esc(formatDate(b.expires_at)) : 'N/A')}</td>
                         <td>${b.is_permanent ? '<span class="badge badge-red">Perm</span>' : '<span class="badge badge-amber">Temp</span>'}</td>
-                        <td class="text-muted text-sm">${formatDate(b.created_at)}</td>
+                        <td class="text-muted text-sm">${esc(formatDate(b.created_at))}</td>
                         <td>
-                            ${b.is_active && hasPermission('unban') ? `<button class="btn btn-success btn-xs" onclick="event.stopPropagation();confirmUnban(${b.id},'${(b.player_name||'').replace(/'/g,"\\'")}')">Unban</button>` : ''}
+                            ${b.is_active && hasPermission('unban') ? `<button class="btn btn-success btn-xs" data-ca-action="confirmUnban" data-id="${escNum(b.id)}">Unban</button>` : ''}
                         </td>
                     </tr>
                 `).join('')}
@@ -84,27 +89,52 @@ function renderBansTable(bans) {
     `;
 }
 
-function viewBan(id, name, reason, admin, expires, cid) {
-    openModal(`Ban Details — ${name}`, `
-        <div class="profile-row"><span class="profile-row-label">Player</span><span class="profile-row-value">${name}</span></div>
-        <div class="profile-row"><span class="profile-row-label">Citizenid</span><span class="profile-row-value">${cid || 'N/A'}</span></div>
-        <div class="profile-row"><span class="profile-row-label">Reason</span><span class="profile-row-value">${reason}</span></div>
-        <div class="profile-row"><span class="profile-row-label">Banned by</span><span class="profile-row-value">${admin}</span></div>
-        <div class="profile-row"><span class="profile-row-label">Expires</span><span class="profile-row-value">${expires}</span></div>
+// Looked up from the last-rendered list by id rather than having six fields
+// (including staff-written reason text) marshalled through HTML attributes
+// and back out again. The old signature only escaped apostrophes in two of
+// the six, so a reason containing a double quote broke out of the attribute
+// entirely.
+function _findBan(id) {
+    return (_lastBans || []).find(b => String(b.id) === String(id)) || null;
+}
+
+function viewBan(id) {
+    const b = _findBan(id);
+    if (!b) return;
+
+    const expires = b.is_permanent ? 'Permanent' : (b.expires_at ? formatDate(b.expires_at) : 'N/A');
+
+    openModal(`Ban Details — ${esc(b.player_name)}`, `
+        <div class="profile-row"><span class="profile-row-label">Player</span><span class="profile-row-value">${esc(b.player_name)}</span></div>
+        <div class="profile-row"><span class="profile-row-label">Citizenid</span><span class="profile-row-value">${esc(b.citizenid || 'N/A')}</span></div>
+        <div class="profile-row"><span class="profile-row-label">Reason</span><span class="profile-row-value">${esc(b.reason)}</span></div>
+        <div class="profile-row"><span class="profile-row-label">Banned by</span><span class="profile-row-value">${esc(b.admin_name)}</span></div>
+        <div class="profile-row"><span class="profile-row-label">Expires</span><span class="profile-row-value">${esc(expires)}</span></div>
     `, hasPermission('unban') ? `
         <button class="btn btn-ghost" onclick="closeModal()">Close</button>
-        <button class="btn btn-success" onclick="closeModal();confirmUnban(${id},'${name}')">Unban</button>
+        <button class="btn btn-success" data-ca-action="confirmUnbanFromModal" data-id="${escNum(b.id)}">Unban</button>
     ` : `<button class="btn btn-ghost" onclick="closeModal()">Close</button>`);
 }
 
-function confirmUnban(banId, name) {
-    openModal(`Unban — ${name}`, `
-        <p style="color:var(--text-secondary)">Are you sure you want to unban <strong style="color:var(--text-primary)">${name}</strong>?</p>
+function confirmUnban(banId) {
+    const b = _findBan(banId);
+    const name = b ? b.player_name : '';
+
+    openModal(`Unban — ${esc(name)}`, `
+        <p style="color:var(--text-secondary)">Are you sure you want to unban <strong style="color:var(--text-primary)">${esc(name)}</strong>?</p>
     `, `
         <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-        <button class="btn btn-success" onclick="doUnban(${banId},'${name}')">Confirm Unban</button>
+        <button class="btn btn-success" data-ca-action="doUnban" data-id="${escNum(banId)}">Confirm Unban</button>
     `);
 }
+
+caAction('viewBan',    (d) => viewBan(d.id));
+caAction('confirmUnban', (d) => confirmUnban(d.id));
+caAction('confirmUnbanFromModal', (d) => { closeModal(); confirmUnban(d.id); });
+caAction('doUnban',    (d) => {
+    const b = _findBan(d.id);
+    doUnban(d.id, b ? b.player_name : '');
+});
 
 async function doUnban(banId, name) {
     await caFetch('cipher-admin:server:unban', { banId, playerName: name });

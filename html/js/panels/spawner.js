@@ -40,9 +40,12 @@ function renderCategories() {
     const cats = document.getElementById('spawner-cats');
     if (!cats) return;
     cats.innerHTML = Object.keys(_vehicleList).map(cat => `
-        <button class="category-btn ${_activeCategory === cat ? 'active' : ''}" onclick="selectCategory('${cat}')">${cat} <span class="text-muted text-sm">(${_vehicleList[cat].length})</span></button>
+        <button class="category-btn ${_activeCategory === cat ? 'active' : ''}" data-ca-action="selectCategory" data-cat="${escAttr(cat)}">${esc(cat)} <span class="text-muted text-sm">(${escNum(_vehicleList[cat].length)})</span></button>
     `).join('');
 }
+
+caAction('selectCategory', (d) => selectCategory(d.cat));
+caAction('spawnVehicle',   (d) => spawnVehicle(d.model));
 
 function selectCategory(cat) {
     _activeCategory = cat;
@@ -80,12 +83,14 @@ function renderVehicleList(list) {
         wrap.innerHTML = '<div class="empty-state"><div class="empty-icon">🚗</div><div class="empty-text">No vehicles found</div></div>';
         return;
     }
-    const icon = VEH_ICONS[_activeCategory] || '🚗';
+    // Renamed off `icon` — core.js now exports a global icon() helper and a
+    // local const of the same name would shadow it inside this function.
+    const vehIcon = VEH_ICONS[_activeCategory] || icon('spawner');
     wrap.innerHTML = `<div class="vehicle-grid">
         ${list.map(v => `
-            <div class="vehicle-card" onclick="spawnVehicle('${v}')" data-tip="${v}">
-                <div class="veh-icon">${icon}</div>
-                <div class="veh-name">${v}</div>
+            <div class="vehicle-card" data-ca-action="spawnVehicle" data-model="${escAttr(v)}" data-tip="${escAttr(v)}">
+                <div class="veh-icon">${vehIcon}</div>
+                <div class="veh-name">${esc(v)}</div>
             </div>
         `).join('')}
     </div>`;

@@ -1,0 +1,18 @@
+# Development-only preview harness. Stubs the NUI bridge with sample data so
+# the interface can be opened in a normal browser for UI work. It is not in
+# fxmanifest's files{} block, so FiveM never serves it — but it has no place
+# in a release either.
+html/preview.html
+
+# Editor / OS noise
+.vscode/
+.idea/
+*.code-workspace
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Local scratch
+*.log
+*.bak
+*.tmp

@@ -1,6 +1,5 @@
 -- Cipher-Admin Server — Player Actions
 
-local QBX           = exports['qbx_core']
 local IsAdmin        = function(src) return exports['cipher-admin']:IsAdmin(src) end
 local HasPermission  = function(src, p) return exports['cipher-admin']:HasPermission(src, p) end
 local GetAdminCache  = function(src) return exports['cipher-admin']:GetAdminCache(src) end
@@ -8,7 +7,7 @@ local Audit          = function(...) exports['cipher-admin']:Audit(...) end
 local GetIdentifiers = function(src) return exports['cipher-admin']:GetIdentifiers(src) end
 
 local function GetTargetPlayer(targetSrc)
-    return QBX:GetPlayer(tonumber(targetSrc))
+    return Framework.GetPlayer(tonumber(targetSrc))
 end
 
 -- ── Main action handler ───────────────────────────────────────────────────────
@@ -249,7 +248,7 @@ RegisterNetEvent('cipher-admin:server:giveVehicleKeys')
 AddEventHandler('cipher-admin:server:giveVehicleKeys', function(plate, model)
     local src = source
     if not IsAdmin(src) then return end
-    local p   = QBX:GetPlayer(src)
+    local p   = Framework.GetPlayer(src)
     local cid = p and p.PlayerData.citizenid
 
     -- qbx_vehiclekeys (standard QBX key resource): addKey(plate, citizenid)
@@ -300,8 +299,7 @@ RegisterNetEvent('cipher-admin:server:selfFoodWater')
 AddEventHandler('cipher-admin:server:selfFoodWater', function()
     local src = source
     if not IsAdmin(src) then return end
-    local QBX = exports['qbx_core']
-    local p   = QBX:GetPlayer(src)
+    local p   = Framework.GetPlayer(src)
     if p then
         p.Functions.SetMetaData('hunger', 100)
         p.Functions.SetMetaData('thirst', 100)
@@ -313,8 +311,7 @@ RegisterNetEvent('cipher-admin:server:selfSetVehicleOwner')
 AddEventHandler('cipher-admin:server:selfSetVehicleOwner', function(plate, modelHash)
     local src = source
     if not IsAdmin(src) then return end
-    local QBX = exports['qbx_core']
-    local p   = QBX:GetPlayer(src)
+    local p   = Framework.GetPlayer(src)
     if not p then return end
     local cid = p.PlayerData.citizenid
     -- Check if plate already registered

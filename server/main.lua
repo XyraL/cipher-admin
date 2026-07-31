@@ -1,6 +1,5 @@
 -- Cipher-Admin Server Core — permissions engine, auth, audit
 
-local QBX = exports['qbx_core']
 
 -- ── In-memory caches ──────────────────────────────────────────────────────────
 local _roles       = {}   -- name -> { label, color, permissions }
@@ -83,12 +82,12 @@ local function BuildAdminCache(src)
             permissions = { all = true },
             isOwner     = true,
         }
-        local p = QBX:GetPlayer(src)
+        local p = Framework.GetPlayer(src)
         if p then _adminCache[src].citizenid = p.PlayerData.citizenid end
         return true
     end
 
-    local p = QBX:GetPlayer(src)
+    local p = Framework.GetPlayer(src)
     if not p then return false end
     local cid  = p.PlayerData.citizenid
     local role = _assignments[cid]
@@ -258,7 +257,7 @@ lib.callback.register('cipher-admin:server:getPlayers', function(src)
     local result = {}
     for _, psrc in ipairs(GetPlayers()) do
         psrc = tonumber(psrc)
-        local p = QBX:GetPlayer(psrc)
+        local p = Framework.GetPlayer(psrc)
         if p then
             local pd   = p.PlayerData
             local cid  = pd.citizenid
@@ -350,7 +349,7 @@ lib.callback.register('cipher-admin:server:assignRole', function(src, data)
     -- Refresh cache for target if online
     for _, psrc in ipairs(GetPlayers()) do
         psrc = tonumber(psrc)
-        local p = QBX:GetPlayer(psrc)
+        local p = Framework.GetPlayer(psrc)
         if p and p.PlayerData.citizenid == data.citizenid then
             _adminCache[psrc] = nil
             BuildAdminCache(psrc)
@@ -369,7 +368,7 @@ lib.callback.register('cipher-admin:server:removeRole', function(src, data)
     _assignments[data.citizenid] = nil
     for _, psrc in ipairs(GetPlayers()) do
         psrc = tonumber(psrc)
-        local p = QBX:GetPlayer(psrc)
+        local p = Framework.GetPlayer(psrc)
         if p and p.PlayerData.citizenid == data.citizenid then
             _adminCache[psrc] = nil
             break
@@ -431,7 +430,7 @@ lib.callback.register('cipher-admin:server:getCharacter', function(src, citizeni
     -- Check if online
     for _, psrc in ipairs(GetPlayers()) do
         psrc = tonumber(psrc)
-        local op = QBX:GetPlayer(psrc)
+        local op = Framework.GetPlayer(psrc)
         if op and op.PlayerData.citizenid == citizenid then
             p.onlineSrc = psrc
             break
@@ -540,7 +539,7 @@ lib.callback.register('cipher-admin:server:deleteCharacter', function(src, data)
 
     -- Block deletion of online players
     for _, psrc in ipairs(GetPlayers()) do
-        local p = QBX:GetPlayer(tonumber(psrc))
+        local p = Framework.GetPlayer(tonumber(psrc))
         if p and p.PlayerData.citizenid == cid then
             return { success = false, reason = 'Player is currently online' }
         end

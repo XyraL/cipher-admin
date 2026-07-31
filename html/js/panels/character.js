@@ -1,5 +1,35 @@
 // Cipher-Admin — Character Lookup Panel
 
+// Character-panel action button. Same reasoning as _profileButtons in
+// players.js: target details ride on data-* attributes so a name containing
+// an apostrophe can't terminate a handler string early.
+function _charBtn(show, act, ico, label, src, cid, name, cls) {
+    if (!show) return '';
+    return `<button class="btn ${cls || 'btn-ghost'} btn-sm"
+        data-ca-action="charBtn"
+        data-act="${escAttr(act)}"
+        data-src="${escNum(src)}"
+        data-cid="${escAttr(cid)}"
+        data-name="${escAttr(name || '')}">${icon(ico)}<span>${esc(label)}</span></button>`;
+}
+
+caAction('charBtn', (d) => {
+    const src = Number(d.src);
+    switch (d.act) {
+        // The online actions all sit inside the character profile modal, so
+        // each closes it before opening whatever comes next.
+        case 'goto':       closeModal(); playerAction('goto', src, d.cid, d.name); break;
+        case 'bring':      closeModal(); playerAction('bring', src, d.cid, d.name); break;
+        case 'warn':       closeModal(); openWarnModal(src, d.cid, d.name); break;
+        case 'kick':       closeModal(); openKickModal(src, d.cid, d.name); break;
+        case 'ban':        closeModal(); openBanModal(src, d.cid, d.name); break;
+        case 'offlineban': openOfflineBanModal(d.cid, d.name); break;
+        case 'deletechar': openDeleteCharModal(d.cid, d.name); break;
+    }
+});
+
+caAction('openCharProfile', (d) => openCharProfile(d.cid));
+
 function renderCharacterPanel() {
     document.getElementById('panel-character').innerHTML = `
         <div class="section-header">
@@ -50,13 +80,13 @@ async function searchCharacter() {
                     <tbody>
                         ${results.map(p => `
                             <tr>
-                                <td class="td-name">${p.firstname} ${p.lastname}</td>
-                                <td class="text-muted text-sm">${p.citizenid}</td>
-                                <td class="text-muted">${p.dob || 'N/A'}</td>
-                                <td><span class="badge badge-muted">${p.job_label || p.job || 'N/A'}</span></td>
-                                <td class="text-muted">${formatMoney(p.cash)}</td>
-                                <td class="text-muted">${formatMoney(p.bank)}</td>
-                                <td><button class="btn btn-ghost btn-xs" onclick="openCharProfile('${p.citizenid}')">View</button></td>
+                                <td class="td-name">${esc(p.firstname)} ${esc(p.lastname)}</td>
+                                <td class="text-muted text-sm">${esc(p.citizenid)}</td>
+                                <td class="text-muted">${esc(p.dob || 'N/A')}</td>
+                                <td><span class="badge badge-muted">${esc(p.job_label || p.job || 'N/A')}</span></td>
+                                <td class="text-muted">${esc(formatMoney(p.cash))}</td>
+                                <td class="text-muted">${esc(formatMoney(p.bank))}</td>
+                                <td><button class="btn btn-ghost btn-xs" data-ca-action="openCharProfile" data-cid="${escAttr(p.citizenid)}">View</button></td>
                             </tr>
                         `).join('')}
                     </tbody>
@@ -126,18 +156,18 @@ async function openCharProfile(citizenid) {
         <div class="profile-section">
             <div class="profile-section-title">Online Actions</div>
             <div class="flex gap-4" style="flex-wrap:wrap">
-                ${hasPermission('teleport')    ? `<button class="btn btn-ghost btn-sm" onclick="closeModal();playerAction('goto',${profile.onlineSrc},'${citizenid}','${name}')">📍 Goto</button>` : ''}
-                ${hasPermission('bring')   ? `<button class="btn btn-ghost btn-sm" onclick="closeModal();playerAction('bring',${profile.onlineSrc},'${citizenid}','${name}')">🔗 Bring</button>` : ''}
-                ${hasPermission('warn')    ? `<button class="btn btn-amber btn-sm" onclick="closeModal();openWarnModal(${profile.onlineSrc},'${citizenid}','${name}')">⚠️ Warn</button>` : ''}
-                ${hasPermission('kick')    ? `<button class="btn btn-ghost btn-sm" onclick="closeModal();openKickModal(${profile.onlineSrc},'${citizenid}','${name}')">👢 Kick</button>` : ''}
-                ${hasPermission('tempban') ? `<button class="btn btn-danger btn-sm" onclick="closeModal();openBanModal(${profile.onlineSrc},'${citizenid}','${name}')">🔨 Ban</button>` : ''}
+                ${_charBtn(hasPermission('teleport'), 'goto',  'goto',  'Goto',  profile.onlineSrc, citizenid, name)}
+                ${_charBtn(hasPermission('bring'),    'bring', 'bring', 'Bring', profile.onlineSrc, citizenid, name)}
+                ${_charBtn(hasPermission('warn'),     'warn',  'warn',  'Warn',  profile.onlineSrc, citizenid, name, 'btn-amber')}
+                ${_charBtn(hasPermission('kick'),     'kick',  'kick',  'Kick',  profile.onlineSrc, citizenid, name)}
+                ${_charBtn(hasPermission('tempban'),  'ban',   'bans',  'Ban',   profile.onlineSrc, citizenid, name, 'btn-danger')}
             </div>
         </div>` : `
         <div class="profile-section">
             <div class="profile-section-title">Offline Actions</div>
             <div class="flex gap-4">
-                ${hasPermission('tempban')   ? `<button class="btn btn-danger btn-sm" onclick="openOfflineBanModal('${citizenid}','${name}')">🔨 Ban Offline</button>` : ''}
-                ${hasPermission('deletechar') ? `<button class="btn btn-danger btn-sm" onclick="openDeleteCharModal('${citizenid}','${name}')">🗑 Delete Character</button>` : ''}
+                ${_charBtn(hasPermission('tempban'),    'offlineban', 'bans',  'Ban Offline',      null, citizenid, name, 'btn-danger')}
+                ${_charBtn(hasPermission('deletechar'), 'deletechar', 'trash', 'Delete Character', null, citizenid, name, 'btn-danger')}
             </div>
         </div>`}
     `);
@@ -145,7 +175,7 @@ async function openCharProfile(citizenid) {
 
 function openOfflineBanModal(cid, name) {
     closeModal();
-    openModal(`Ban Offline — ${name}`, `
+    openModal(`Ban Offline — ${esc(name)}`, `
         <div class="form-group">
             <label>Reason</label>
             <input class="input" id="offban-reason" placeholder="Enter reason...">
@@ -153,14 +183,17 @@ function openOfflineBanModal(cid, name) {
         <div class="form-group">
             <label>Duration</label>
             <select class="select" id="offban-duration">
-                ${(CA.banPresets || []).map(p => `<option value="${p.seconds}">${p.label}</option>`).join('')}
+                ${(CA.banPresets || []).map(p => `<option value="${escNum(p.seconds)}">${esc(p.label)}</option>`).join('')}
             </select>
         </div>
     `, `
         <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-        <button class="btn btn-danger" onclick="doOfflineBan('${cid}','${name}')">Ban</button>
+        <button class="btn btn-danger" data-ca-action="doOfflineBan"
+            data-cid="${escAttr(cid)}" data-name="${escAttr(name || '')}">Ban</button>
     `);
 }
+
+caAction('doOfflineBan', (d) => doOfflineBan(d.cid, d.name));
 
 async function doOfflineBan(cid, name) {
     const reason   = document.getElementById('offban-reason').value.trim();
@@ -174,14 +207,16 @@ async function doOfflineBan(cid, name) {
 
 function openDeleteCharModal(cid, name) {
     closeModal();
-    openModal('Delete Character — ' + name,
+    openModal('Delete Character — ' + esc(name),
         '<p style="color:var(--red);font-weight:600">This will permanently delete the character and all associated data from the database. This cannot be undone.</p>'
-        + '<div class="profile-row"><span class="profile-row-label">Citizenid</span><span class="profile-row-value" style="font-family:monospace">' + cid + '</span></div>'
-        + '<div class="profile-row"><span class="profile-row-label">Name</span><span class="profile-row-value">' + name + '</span></div>'
-        + '<div class="form-group mt-12"><label>Type the citizenid to confirm</label><input class="input" id="del-confirm" placeholder="' + cid + '"></div>',
+        + '<div class="profile-row"><span class="profile-row-label">Citizenid</span><span class="profile-row-value" style="font-family:monospace">' + esc(cid) + '</span></div>'
+        + '<div class="profile-row"><span class="profile-row-label">Name</span><span class="profile-row-value">' + esc(name) + '</span></div>'
+        + '<div class="form-group mt-12"><label>Type the citizenid to confirm</label><input class="input" id="del-confirm" placeholder="' + escAttr(cid) + '"></div>',
         '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
-        + '<button class="btn btn-danger" onclick="doDeleteChar(\'' + cid + '\',\'' + name + '\')">Permanently Delete</button>');
+        + '<button class="btn btn-danger" data-ca-action="doDeleteChar" data-cid="' + escAttr(cid) + '" data-name="' + escAttr(name || '') + '">Permanently Delete</button>');
 }
+
+caAction('doDeleteChar', (d) => doDeleteChar(d.cid, d.name));
 
 async function doDeleteChar(cid, name) {
     var inp = document.getElementById('del-confirm');
@@ -192,11 +227,11 @@ async function doDeleteChar(cid, name) {
     var result = await caFetch('cipher-admin:server:deleteCharacter', { citizenid: cid, name: name });
     closeModal();
     if (result && result.success) {
-        openModal('Character Deleted', '<p style="color:var(--green)">' + name + ' has been permanently removed from the database.</p>',
+        openModal('Character Deleted', '<p style="color:var(--green)">' + esc(name) + ' has been permanently removed from the database.</p>',
             '<button class="btn btn-ghost" onclick="closeModal()">OK</button>');
     } else {
         var reason = (result && result.reason) || 'Unknown error';
-        openModal('Delete Failed', '<p style="color:var(--red)">' + reason + '</p>', '<button class="btn btn-ghost" onclick="closeModal()">OK</button>');
+        openModal('Delete Failed', '<p style="color:var(--red)">' + esc(reason) + '</p>', '<button class="btn btn-ghost" onclick="closeModal()">OK</button>');
     }
 }
 
