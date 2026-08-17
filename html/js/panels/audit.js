@@ -11,23 +11,11 @@ const AUDIT_ACTIONS = [
     'STRIP_WEAPONS',
 ];
 
-const AUDIT_ICONS = {
-    KICK:'👢', WARN:'⚠️', TEMPBAN:'⏱', PERMBAN:'🔨', UNBAN:'✅',
-    FREEZE:'🧊', UNFREEZE:'🔥', REVIVE:'💚', HEAL:'💊',
-    GOTO:'📍', BRING:'🔗', SPECTATE:'👁',
-    GIVE_ITEM:'📦', REMOVE_ITEM:'📤', CLEAR_INVENTORY:'🗑',
-    SPAWN_VEHICLE:'🚗', DELETE_VEHICLE:'💥',
-    SET_JOB:'💼', SET_CASH:'💵', SET_BANK:'🏦',
-    ANNOUNCEMENT:'📢', SET_WEATHER:'🌤', SET_TIME:'🕐',
-    ADD_NOTE:'📝', ASSIGN_ROLE:'🔐', REMOVE_ROLE:'🗑', EDIT_ROLE:'✏️',
-    STRIP_WEAPONS:'🔫',
-};
-
 async function loadAudit() {
     const panel = document.getElementById('panel-audit');
 
     if (!hasPermission('viewaudit')) {
-        panel.innerHTML = '<div class="empty-state"><div class="empty-icon">🔒</div><div class="empty-text">No permission to view audit log</div></div>';
+        panel.innerHTML = emptyState('lock', 'No permission to view audit log');
         return;
     }
 
@@ -44,7 +32,7 @@ async function loadAudit() {
                 <div class="flex gap-8" style="flex-wrap:wrap">
                     <select class="select" style="width:180px" id="audit-action-filter">
                         <option value="">All Actions</option>
-                        ${AUDIT_ACTIONS.map(a => `<option value="${a}">${AUDIT_ICONS[a]||''} ${a.replace(/_/g,' ')}</option>`).join('')}
+                        ${AUDIT_ACTIONS.map(a => `<option value="${a}">${a.replace(/_/g, ' ')}</option>`).join('')}
                     </select>
                     <input class="input" style="width:160px" id="audit-admin-filter" placeholder="Filter by admin...">
                     <input class="input" type="date" id="audit-from" style="width:145px">
@@ -103,7 +91,7 @@ function renderAuditTable(rows) {
             <tbody>
                 ${rows.map(r => `
                     <tr>
-                        <td style="font-size:15px;text-align:center">${AUDIT_ICONS[r.action] || '◈'}</td>
+                        <td class="td-icon">${actionIcon(r.action)}</td>
                         <td class="td-action">${r.action.replace(/_/g,' ')}</td>
                         <td style="color:var(--accent);font-weight:600">${r.admin_name}</td>
                         <td class="text-muted">${r.target_name || '—'}</td>

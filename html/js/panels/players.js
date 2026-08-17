@@ -20,7 +20,11 @@ async function loadPlayers() {
                 <option value="src">Sort: Server ID</option>
             </select>
             <button class="btn btn-ghost btn-sm" onclick="loadPlayers()">↻ Refresh</button>
-            ${hasPermission('summonall') ? `<button class="btn btn-amber btn-sm" onclick="confirmSummonAll()">⚡ Summon All</button>` : ''}
+            ${hasPermission('summonall') ? `<button class="btn btn-amber btn-sm" onclick="confirmSummonAll()">Summon All</button>` : ''}
+            ${hasPermission('massactions') ? `
+                <button class="btn btn-ghost btn-sm" data-ca-action="massAction" data-act="freezeall" data-state="true">Freeze All</button>
+                <button class="btn btn-ghost btn-sm" data-ca-action="massAction" data-act="freezeall" data-state="false">Unfreeze All</button>
+                <button class="btn btn-ghost btn-sm" data-ca-action="massAction" data-act="revivenearby">Revive Nearby</button>` : ''}
         </div>
         <div class="card">
             <div class="card-body" style="padding:0">
@@ -135,8 +139,8 @@ async function selectPlayer(src) {
 
 function _fmtOnlineTime(secs) {
     if (!secs) return '—';
-    var h = Math.floor(secs / 3600);
-    var m = Math.floor((secs % 3600) / 60);
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
     if (h > 0) return h + 'h ' + m + 'm';
     return m + 'm';
 }
@@ -191,6 +195,13 @@ function renderPlayerProfile(p) {
     const canScreenshot  = hasPermission('screenshot');
     const canGiveWeapon  = hasPermission('giveweapon');
     const canSummonAll   = hasPermission('summonall');
+    const canClearWanted = hasPermission('clearwanted');
+    const canKill        = hasPermission('killplayer');
+    const canSetHealth   = hasPermission('sethealth');
+    const canEject       = hasPermission('eject');
+    const canMute        = hasPermission('mute');
+    const canViewIds     = hasPermission('viewids');
+    const canSendTo      = hasPermission('teleport');
 
     const src = p.onlineSrc || p.src;
 
@@ -207,7 +218,7 @@ function renderPlayerProfile(p) {
     // admin's own session.
     document.getElementById('player-profile-inner').innerHTML = `
         <div class="profile-header">
-            <div class="profile-avatar">👤</div>
+            <div class="profile-avatar">${icon('players')}</div>
             <div>
                 <div class="profile-name">${esc(p.name || (ci.firstname + ' ' + ci.lastname))}</div>
                 <div class="profile-cid">${esc(p.citizenid)} · ID ${escNum(src)}</div>
@@ -236,6 +247,11 @@ function renderPlayerProfile(p) {
                     { show: canResetPos,   kind: 'do',   act: 'resetpos',      ico: 'goto',      label: 'Reset Pos' },
                     { show: canDm,         kind: 'open', act: 'dm',            ico: 'adminchat', label: 'DM' },
                     { show: canGiveWeapon, kind: 'open', act: 'giveweapon',    ico: 'shield',    label: 'Give Weapon' },
+                    { show: canClearWanted, kind: 'do',   act: 'clearwanted',  ico: 'check',     label: 'Clear Wanted' },
+                    { show: canSetHealth,  kind: 'open', act: 'sethealth',     ico: 'heal',      label: 'Set HP' },
+                    { show: canEject,      kind: 'open', act: 'eject',         ico: 'kick',      label: 'Eject' },
+                    { show: canSendTo,     kind: 'open', act: 'sendto',        ico: 'goto',      label: 'Send To' },
+                    { show: canViewIds,    kind: 'open', act: 'identifiers',   ico: 'search',    label: 'Identifiers' },
                 ])}
             </div>
         </div>
@@ -245,9 +261,11 @@ function renderPlayerProfile(p) {
             <div class="profile-section-title">Moderation</div>
             <div class="profile-actions">
                 ${_profileButtons(p, src, [
-                    { show: canWarn,    kind: 'open', act: 'warn', ico: 'warn',  label: 'Warn', cls: 'btn-amber' },
-                    { show: canKick,    kind: 'open', act: 'kick', ico: 'kick',  label: 'Kick' },
-                    { show: canTempBan, kind: 'open', act: 'ban',  ico: 'bans',  label: 'Ban',  cls: 'btn-danger' },
+                    { show: canWarn,    kind: 'open', act: 'warn',  ico: 'warn',  label: 'Warn', cls: 'btn-amber' },
+                    { show: canMute,    kind: 'open', act: 'mute',  ico: 'adminchat', label: 'Mute', cls: 'btn-amber' },
+                    { show: canKick,    kind: 'open', act: 'kick',  ico: 'kick',  label: 'Kick' },
+                    { show: canKill,    kind: 'open', act: 'kill',  ico: 'warn',  label: 'Kill', cls: 'btn-danger' },
+                    { show: canTempBan, kind: 'open', act: 'ban',   ico: 'bans',  label: 'Ban',  cls: 'btn-danger' },
                 ])}
             </div>
         </div>
@@ -493,7 +511,7 @@ async function addNote(cid, name) {
     input.value = '';
 }
 
-var _weapons = [
+const _weapons = [
     'WEAPON_PISTOL','WEAPON_PISTOL_MK2','WEAPON_COMBATPISTOL','WEAPON_APPISTOL','WEAPON_STUNGUN',
     'WEAPON_MICROSMG','WEAPON_SMG','WEAPON_SMG_MK2','WEAPON_ASSAULTSMG','WEAPON_COMBATPDW',
     'WEAPON_ASSAULTRIFLE','WEAPON_ASSAULTRIFLE_MK2','WEAPON_CARBINERIFLE','WEAPON_CARBINERIFLE_MK2',
@@ -506,17 +524,21 @@ var _weapons = [
 ];
 
 function openGiveWeaponModal(src, cid, name) {
-    var opts = _weapons.map(function(w) { return '<option value="' + w + '">' + w.replace('WEAPON_','') + '</option>'; }).join('');
+    const opts = _weapons.map(function(w) { return '<option value="' + w + '">' + w.replace('WEAPON_','') + '</option>'; }).join('');
     openModal('Give Weapon — ' + name,
         '<div class="form-group"><label>Weapon</label><select class="select" id="gw-weapon">' + opts + '</select></div>'
         + '<div class="form-group"><label>Ammo</label><input class="input" id="gw-ammo" type="number" value="100" min="1" max="9999"></div>',
         '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
-        + '<button class="btn btn-primary" onclick="doGiveWeapon(' + src + ',\'' + cid + '\',\'' + name + '\')">Give</button>');
+        + '<button class="btn btn-primary" data-ca-action="doGiveWeapon"'
+        + ' data-src="' + escNum(src) + '" data-cid="' + escAttr(cid) + '"'
+        + ' data-name="' + escAttr(name || '') + '">Give</button>');
 }
 
+caAction('doGiveWeapon', (d) => doGiveWeapon(Number(d.src), d.cid, d.name));
+
 function doGiveWeapon(src, cid, name) {
-    var weapon = (document.getElementById('gw-weapon') || {}).value || 'WEAPON_PISTOL';
-    var ammo   = parseInt((document.getElementById('gw-ammo') || {}).value) || 100;
+    const weapon = (document.getElementById('gw-weapon') || {}).value || 'WEAPON_PISTOL';
+    const ammo   = parseInt((document.getElementById('gw-ammo') || {}).value) || 100;
     closeModal();
     playerAction('giveweapon', src, cid, name, { weapon: weapon, ammo: ammo });
 }
@@ -525,11 +547,15 @@ function openDmModal(src, cid, name) {
     openModal('DM — ' + name,
         '<div class="form-group"><label>Message</label><input class="input" id="dm-inp" placeholder="Private message to player..."></div>',
         '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
-        + '<button class="btn btn-primary" onclick="doDm(' + src + ',\'' + cid + '\',\'' + name + '\')">Send</button>');
+        + '<button class="btn btn-primary" data-ca-action="doDm"'
+        + ' data-src="' + escNum(src) + '" data-cid="' + escAttr(cid) + '"'
+        + ' data-name="' + escAttr(name || '') + '">Send</button>');
 }
 
+caAction('doDm', (d) => doDm(Number(d.src), d.cid, d.name));
+
 function doDm(src, cid, name) {
-    var msg = (document.getElementById('dm-inp') || {}).value || '';
+    const msg = (document.getElementById('dm-inp') || {}).value || '';
     if (!msg.trim()) return;
     closeModal();
     playerAction('dm', src, cid, name, { message: msg.trim() });
@@ -539,7 +565,7 @@ function confirmSummonAll() {
     openModal('Summon All Players',
         '<p style="color:var(--text-secondary)">Teleport <strong style="color:var(--amber)">all online players</strong> to your current position? This affects everyone on the server.</p>',
         '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
-        + '<button class="btn btn-amber" onclick="doSummonAll()">&#x26A1; Summon All</button>');
+        + '<button class="btn btn-amber" onclick="doSummonAll()">Summon All</button>');
 }
 
 async function doSummonAll() {
@@ -598,11 +624,191 @@ caAction('playerBtn', (d) => {
         case 'watch':      startLiveWatch(src, name); break;
         case 'dm':         openDmModal(src, cid, name); break;
         case 'giveweapon': openGiveWeaponModal(src, cid, name); break;
-        case 'warn':       openWarnModal(src, cid, name); break;
-        case 'kick':       openKickModal(src, cid, name); break;
-        case 'ban':        openBanModal(src, cid, name); break;
+        case 'warn':        openWarnModal(src, cid, name); break;
+        case 'kick':        openKickModal(src, cid, name); break;
+        case 'ban':         openBanModal(src, cid, name); break;
+        case 'kill':        openKillModal(src, cid, name); break;
+        case 'sethealth':   openSetHealthModal(src, cid, name); break;
+        case 'eject':       openEjectModal(src, cid, name); break;
+        case 'sendto':      openSendToModal(src, cid, name); break;
+        case 'mute':        openMuteModal(src, cid, name); break;
+        case 'identifiers': openIdentifiersModal(src, cid, name); break;
     }
 });
+
+// ── Mass actions ──────────────────────────────────────────────────────────────
+// Freeze All skips other staff server-side, so an admin cannot lock out
+// everyone who could undo it.
+caAction('massAction', async (d) => {
+    const res = await caFetch('cipher-admin:server:massAction', {
+        action: d.act,
+        state:  d.state === 'true',
+        radius: 50.0,
+    });
+    if (!res || !res.success) return;
+
+    const what = d.act === 'revivenearby'
+        ? `Revived ${res.count} player${res.count === 1 ? '' : 's'} nearby`
+        : `${d.state === 'true' ? 'Froze' : 'Unfroze'} ${res.count} player${res.count === 1 ? '' : 's'}`;
+
+    openModal('Mass Action', `<p style="color:var(--text-secondary)">${esc(what)}.</p>`,
+        '<button class="btn btn-ghost" onclick="closeModal()">OK</button>');
+});
+
+// ── Kill ──────────────────────────────────────────────────────────────────────
+function openKillModal(src, cid, name) {
+    openModal(`Kill — ${name}`,
+        '<p style="color:var(--text-secondary)">This kills the player where they stand. '
+        + 'They will need a revive or a respawn.</p>',
+        '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
+        + '<button class="btn btn-danger" data-ca-action="doKill" data-src="' + escNum(src)
+        + '" data-cid="' + escAttr(cid) + '" data-name="' + escAttr(name || '') + '">Kill</button>');
+}
+
+caAction('doKill', (d) => {
+    closeModal();
+    playerAction('kill', Number(d.src), d.cid, d.name);
+});
+
+// ── Set health / armour ───────────────────────────────────────────────────────
+function openSetHealthModal(src, cid, name) {
+    openModal(`Set Health — ${name}`,
+        '<div class="form-group"><label>Health (1&ndash;200)</label>'
+        + '<input class="input" id="sh-hp" type="number" min="1" max="200" value="200"></div>'
+        + '<div class="form-group"><label>Armour (0&ndash;100)</label>'
+        + '<input class="input" id="sh-armour" type="number" min="0" max="100" value="0"></div>'
+        + '<div style="font-size:11px;color:var(--text-muted)">Health 0 is not allowed here &mdash; '
+        + 'use Kill for that.</div>',
+        '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
+        + '<button class="btn btn-primary" data-ca-action="doSetHealth" data-src="' + escNum(src)
+        + '" data-cid="' + escAttr(cid) + '" data-name="' + escAttr(name || '') + '">Apply</button>');
+}
+
+caAction('doSetHealth', (d) => {
+    const hp     = parseInt((document.getElementById('sh-hp') || {}).value) || 200;
+    const armour = parseInt((document.getElementById('sh-armour') || {}).value) || 0;
+    closeModal();
+    playerAction('sethealth', Number(d.src), d.cid, d.name, { health: hp, armour: armour });
+});
+
+// ── Eject ─────────────────────────────────────────────────────────────────────
+function openEjectModal(src, cid, name) {
+    openModal(`Eject — ${name}`,
+        '<p style="color:var(--text-secondary)">Remove this player from the vehicle they are in.</p>'
+        + '<div class="form-group" style="margin-top:10px"><label>Also delete the vehicle</label> '
+        + '<label class="toggle" style="display:inline-flex"><input type="checkbox" id="ej-del">'
+        + '<div class="toggle-track"></div><div class="toggle-thumb"></div></label></div>',
+        '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
+        + '<button class="btn btn-primary" data-ca-action="doEject" data-src="' + escNum(src)
+        + '" data-cid="' + escAttr(cid) + '" data-name="' + escAttr(name || '') + '">Eject</button>');
+}
+
+caAction('doEject', (d) => {
+    const del = document.getElementById('ej-del') ? document.getElementById('ej-del').checked : false;
+    closeModal();
+    playerAction('eject', Number(d.src), d.cid, d.name, { delete: del });
+});
+
+// ── Send to coordinates ───────────────────────────────────────────────────────
+function openSendToModal(src, cid, name) {
+    const marks = (CA.lists && CA.lists.landmarks) || SELF_LANDMARKS || [];
+    const opts = marks.map((l, i) => `<option value="${i}">${esc(l.name)}</option>`).join('');
+
+    openModal(`Send ${name} To`,
+        '<div class="form-group"><label>Landmark</label>'
+        + '<select class="select" id="st-landmark"><option value="">— custom coordinates —</option>'
+        + opts + '</select></div>'
+        + '<div class="form-group"><label>X</label><input class="input" id="st-x" type="number" step="0.01"></div>'
+        + '<div class="form-group"><label>Y</label><input class="input" id="st-y" type="number" step="0.01"></div>'
+        + '<div class="form-group"><label>Z</label><input class="input" id="st-z" type="number" step="0.01"></div>',
+        '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
+        + '<button class="btn btn-primary" data-ca-action="doSendTo" data-src="' + escNum(src)
+        + '" data-cid="' + escAttr(cid) + '" data-name="' + escAttr(name || '') + '">Send</button>');
+
+    // Picking a landmark fills the coordinate fields rather than replacing them,
+    // so it can be nudged before sending.
+    const sel = document.getElementById('st-landmark');
+    if (sel) sel.onchange = function () {
+        const l = marks[Number(this.value)];
+        if (!l) return;
+        document.getElementById('st-x').value = l.x;
+        document.getElementById('st-y').value = l.y;
+        document.getElementById('st-z').value = l.z;
+    };
+}
+
+caAction('doSendTo', (d) => {
+    const g = (id) => parseFloat((document.getElementById(id) || {}).value);
+    const x = g('st-x'), y = g('st-y'), z = g('st-z');
+    if (isNaN(x) || isNaN(y) || isNaN(z)) return;
+    closeModal();
+    playerAction('sendto', Number(d.src), d.cid, d.name, { x: x, y: y, z: z });
+});
+
+// ── Mute ──────────────────────────────────────────────────────────────────────
+function openMuteModal(src, cid, name) {
+    const durations = [
+        ['300', '5 minutes'], ['900', '15 minutes'], ['1800', '30 minutes'],
+        ['3600', '1 hour'], ['86400', '24 hours'], ['0', 'Permanent'],
+    ].map(d => `<option value="${d[0]}">${d[1]}</option>`).join('');
+
+    openModal(`Mute — ${name}`,
+        '<div class="form-group"><label>Reason</label>'
+        + '<input class="input" id="mute-reason" placeholder="Enter reason..."></div>'
+        + '<div class="form-group"><label>Duration</label>'
+        + '<select class="select" id="mute-duration">' + durations + '</select></div>'
+        + '<div style="font-size:11px;color:var(--text-muted)">Mutes chat. Voice is handled by your '
+        + 'voice resource &mdash; see Config.MuteVoiceExport. Mutes survive restarts.</div>',
+        '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
+        + '<button class="btn btn-success" data-ca-action="doUnmute" data-cid="' + escAttr(cid)
+        + '" data-src="' + escNum(src) + '" data-name="' + escAttr(name || '') + '">Unmute</button>'
+        + '<button class="btn btn-amber" data-ca-action="doMute" data-cid="' + escAttr(cid)
+        + '" data-src="' + escNum(src) + '" data-name="' + escAttr(name || '') + '">Mute</button>');
+}
+
+caAction('doMute', async (d) => {
+    const reason   = (document.getElementById('mute-reason') || {}).value || 'No reason given';
+    const duration = parseInt((document.getElementById('mute-duration') || {}).value) || 0;
+    closeModal();
+    await caFetch('cipher-admin:server:mutePlayer', {
+        citizenid: d.cid, targetSrc: Number(d.src), playerName: d.name,
+        reason: reason, duration: duration,
+    });
+});
+
+caAction('doUnmute', async (d) => {
+    closeModal();
+    await caFetch('cipher-admin:server:mutePlayer', {
+        citizenid: d.cid, targetSrc: Number(d.src), playerName: d.name, unmute: true,
+    });
+});
+
+// ── Identifiers ───────────────────────────────────────────────────────────────
+async function openIdentifiersModal(src, cid, name) {
+    openModal(`Identifiers — ${name}`,
+        '<div class="empty-state"><div class="empty-text">Loading...</div></div>',
+        '<button class="btn btn-ghost" onclick="closeModal()">Close</button>');
+
+    const ids = await caFetch('cipher-admin:server:getPlayerIdentifiers', {
+        targetSrc: src, targetCid: cid, targetName: name,
+    });
+
+    const body = document.querySelector('#ca-modal .modal-body');
+    if (!body) return;
+
+    if (!ids || !ids.length) {
+        body.innerHTML = '<div class="empty-state"><div class="empty-text">No identifiers available</div></div>';
+        return;
+    }
+
+    body.innerHTML = ids.map(i => `
+        <div class="profile-row">
+            <span class="profile-row-label">${esc(i.type)}</span>
+            <span class="profile-row-value mono" style="user-select:all">${esc(i.value)}</span>
+        </div>`).join('')
+        + '<div style="font-size:11px;color:var(--text-muted);margin-top:8px">'
+        + 'Select a value to copy. Viewing identifiers is written to the audit log.</div>';
+}
 
 window._profileButtons     = _profileButtons;
 window.loadPlayers         = loadPlayers;

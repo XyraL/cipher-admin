@@ -1,37 +1,15 @@
--- ─────────────────────────────────────────────────────────────
--- Framework bridge
+-- Framework bridge — detects QBox (qbx_core) or QBCore (qb-core) and exposes
+-- one API so nothing else in this resource branches on which is running.
 --
--- Auto-detects QBox (qbx_core) or QBCore (qb-core) and exposes one API, so
--- nothing else in this resource branches on which framework is running.
---
--- Until now the README, the fxmanifest dependencies block and the GitHub
--- description all advertised "QBox / QBCore" while the code called
--- exports['qbx_core'] directly in five files — so QBCore servers installed it
--- and hit an immediate export error. This file is what makes that claim true.
---
--- The good news is that the surface needing abstraction is tiny: both
--- frameworks return a player object with the SAME shape (`.PlayerData` with
--- citizenid/charinfo/money/items, and `.Functions` with AddMoney/RemoveMoney/
--- AddItem/RemoveItem/SetJob/SetMetaData). Only the way you *obtain* that
--- object differs, so that is all this bridge normalises. Call sites keep
--- using `player.PlayerData.citizenid` and `player.Functions.AddMoney(...)`
--- exactly as before.
--- ─────────────────────────────────────────────────────────────
--- ── NUI response guard (client only) ─────────────────────────
--- cb(nil) sends no response body at all, so the page's fetch never settles —
--- not resolved, not rejected, just pending forever, and whatever panel was
--- awaiting it sits on "Loading..." for good.
---
--- Sixteen server callbacks here can legitimately return nil: getInventory when
--- the player isn't found, getCharacter on a bad search, and so on. Every one
--- of those was a potential permanent hang.
---
--- false is the right substitute — it encodes to JSON, and every consumer in
--- the panel tests these results for truthiness (`if (!targetData)`,
--- `rows || []`), so "no data" still reads as "no data".
---
--- Found while fixing the identical bug in cipher-trucking, where it was the
--- root cause of tabs never finishing loading.
+-- The surface needing abstraction is small: both frameworks return a player
+-- object with the same shape (.PlayerData with citizenid/charinfo/money/items,
+-- .Functions with AddMoney/RemoveMoney/AddItem/RemoveItem/SetJob/SetMetaData).
+-- Only obtaining it differs.
+
+-- cb(nil) sends no response body, so the page's fetch never settles and the
+-- calling panel sits on "Loading..." forever. Sixteen server callbacks can
+-- legitimately return nil. false encodes fine and still reads as "no data" to
+-- every consumer in the panel.
 if not IsDuplicityVersion() and type(RegisterNUICallback) == 'function' then
     local _registerNUI = RegisterNUICallback
 
@@ -53,14 +31,12 @@ elseif GetResourceState('qb-core') == 'started' then
     Framework.name = 'qbcore'
     Framework.core = exports['qb-core']:GetCoreObject()
 else
-    -- Deliberately not a hard error: the NUI should still be able to load so
-    -- an admin can see the panel and read this message, rather than the
-    -- resource dying silently and looking like a missing file.
+    -- Not a hard error: the panel should still open so an admin can read this.
     print('^1[cipher-admin]^0 No supported framework found. Start qbx_core or qb-core BEFORE cipher-admin.')
 end
 
 -- Returns the framework player object for a server id, or nil if that source
--- has no loaded character. Callers already handle nil.
+-- has no loaded character.
 function Framework.GetPlayer(src)
     if not src then return nil end
 
@@ -72,14 +48,6 @@ function Framework.GetPlayer(src)
     return nil
 end
 
--- GetPlayer is deliberately the ONLY function here. Two other things looked
--- like they'd need bridging and turned out not to:
---   * Enumerating players — the codebase uses the native GetPlayers(), which
---     is framework-agnostic already.
---   * Offline character lookups — those go straight to the `players` table,
---     and QBox and QBCore share that schema.
--- Adding wrappers for either would have been abstraction with no caller.
-
-if Config and Config.Debug then
-    print(('^2[cipher-admin]^0 framework bridge loaded (%s)'):format(Framework.name or 'NONE'))
-end
+-- GetPlayer is the only function here on purpose. Player enumeration uses the
+-- native GetPlayers(), and offline lookups read the `players` table directly —
+-- both already framework-agnostic.

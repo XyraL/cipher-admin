@@ -1,30 +1,17 @@
 // Cipher-Admin — Core primitives
 //
-// Loaded before app.js and every panel. Three things live here because all
-// three are needed by every panel and none of them belong to any one of them:
-// output escaping, the icon set, and click delegation.
+// Output escaping, the icon set and click delegation: needed by every panel,
+// owned by none of them.
 //
-// ── Why escaping is not optional here ────────────────────────────────────────
-// This panel renders data that PLAYERS control — character names, ban reasons,
-// report text, admin notes — into an interface used by STAFF. That is the
-// worst possible direction for an injection to travel: the payload is written
-// by someone untrusted and executes in a session holding every admin
-// permission the server has.
-//
-// It was also already broken for ordinary input. Names were interpolated into
-// inline handlers like onclick="playerAction('goto','${p.name}')" — a
-// single-quoted JS string inside a double-quoted HTML attribute — so a player
-// named O'Brien silently broke every action button on their row.
-//
-// Rather than escape for that nested context (HTML attribute containing a JS
-// string literal, which needs two different escapes applied in the right
-// order and is easy to get subtly wrong), the inline handlers are gone. Panels
-// emit data-* attributes and a single delegated listener dispatches them. Data
-// never becomes code, so there is no nesting to get wrong.
+// This panel renders player-controlled data — names, ban reasons, report text
+// — into a session holding every admin permission on the server, so escaping
+// is not optional. Panels emit data-* attributes and a delegated listener
+// dispatches them, rather than interpolating values into inline handlers where
+// an apostrophe breaks the row and a crafted name does worse.
 
 // ── Escaping ────────────────────────────────────────────────────────────────
 
-// For text nodes. Use for anything landing between tags.
+// For text nodes.
 function esc(v) {
     if (v === null || v === undefined) return '';
     return String(v)
@@ -35,15 +22,14 @@ function esc(v) {
         .replace(/'/g, '&#39;');
 }
 
-// For values landing inside an attribute (title="...", data-x="..."). Same
-// output as esc(); kept as a separate name so the intent is visible at the
-// call site and the two can diverge later if they ever need to.
+// For attribute values. Same output as esc(); a separate name so intent is
+// visible at the call site and the two can diverge later.
 function escAttr(v) {
     return esc(v);
 }
 
-// Numbers that reach markup. Returns 0 rather than NaN so a bad value renders
-// as something harmless instead of literal "NaN" or breaking a calc().
+// Returns 0 rather than NaN so a bad value cannot render as "NaN" or break a
+// calc().
 function escNum(v) {
     const n = Number(v);
     return Number.isFinite(n) ? n : 0;
@@ -54,13 +40,9 @@ window.escAttr = escAttr;
 window.escNum = escNum;
 
 // ── Icons ───────────────────────────────────────────────────────────────────
-// Inline SVG, stroked with currentColor, on a shared 24x24 grid.
-//
-// Replaces a mix of geometric text glyphs (◈ ◉ ◎ ⬡) and colour emoji
-// (📋 🌐 📊 🚗 💚). Those never matched: emoji ignore colour and font-weight
-// entirely and render in the platform's own palette, so a nav where half the
-// icons follow the theme and half are little colour pictures always reads as
-// unfinished no matter how good the rest of the styling is.
+// Inline SVG, stroked with currentColor, on a shared 24x24 grid. Emoji ignore
+// colour and font-weight entirely, so a panel mixing the two always reads as
+// unfinished however good the rest of the styling is.
 const CA_ICONS = {
     dashboard:  '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
     players:    '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
@@ -76,6 +58,11 @@ const CA_ICONS = {
     stats:      '<path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/>',
     self:       '<path d="m12 3 2.6 5.6 6.1.8-4.5 4.2 1.2 6.1L12 16.8 6.6 19.7l1.2-6.1L3.3 9.4l6.1-.8Z"/>',
     adminchat:  '<path d="M21 15a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2Z"/>',
+    threats:    '<path d="M12 2.5 4.5 5.8v5.6c0 4.6 3.2 8.6 7.5 10 4.3-1.4 7.5-5.4 7.5-10V5.8Z"/><path d="M12 8.5v4"/><circle cx="12" cy="15.6" r=".6"/>',
+    link:       '<path d="M9 15h-2a4 4 0 0 1 0-8h2"/><path d="M15 7h2a4 4 0 0 1 0 8h-2"/><path d="M8.5 11h7"/>',
+    weapon:     '<path d="M3 8h13l3 3h2v3h-4l-2 3h-3l-1-3H7v2H4a1 1 0 0 1-1-1Z"/><path d="M9 14v3"/>',
+    map:        '<path d="m9 4-6 2.5v13L9 17l6 2.5 6-2.5v-13L15 6.5Z"/><path d="M9 4v13"/><path d="M15 6.5v13"/>',
+    tag:        '<path d="M12 3a6 6 0 0 0-6 6c0 4.2 6 12 6 12s6-7.8 6-12a6 6 0 0 0-6-6Z"/><path d="M9.5 9h5"/>',
 
     close:      '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
     search:     '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/>',
@@ -97,10 +84,41 @@ const CA_ICONS = {
     clock:      '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/>',
     shield:     '<path d="M12 2.5 4.5 5.8v5.6c0 4.6 3.2 8.6 7.5 10 4.3-1.4 7.5-5.4 7.5-10V5.8Z"/>',
     server:     '<rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01"/><path d="M7 16.5h.01"/>',
+    weather:    '<circle cx="9" cy="8.5" r="3.2"/><path d="M9 2.6v1.4M9 13v1.4M3.4 8.5h1.4M13.2 8.5h1.4M5 4.5l1 1M12 11.5l1 1M12 5.5l1-1M5 12.5l1-1"/><path d="M17.5 20H8.8a3.3 3.3 0 0 1 0-6.6 4.4 4.4 0 0 1 8.4 1.1 2.8 2.8 0 0 1 .3 5.5Z"/>',
+    job:        '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/>',
+    lock:       '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+    list:       '<path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3.5 6h.01"/><path d="M3.5 12h.01"/><path d="M3.5 18h.01"/>',
 };
 
-// `cls` lands on the <svg> so callers can size or colour a single instance
-// without a dedicated CSS rule.
+// Audit action -> icon name. Was two separate emoji maps in audit.js and
+// dashboard.js that had drifted nine actions apart.
+const CA_ACTION_ICONS = {
+    KICK: 'kick',                WARN: 'warn',
+    TEMPBAN: 'clock',            PERMBAN: 'bans',
+    UNBAN: 'check',              AUTO_TEMPBAN: 'threats',
+    AUTO_PERMBAN: 'threats',     RESOLVE_THREATS: 'threats',
+    FREEZE: 'freeze',            UNFREEZE: 'refresh',
+    REVIVE: 'revive',            HEAL: 'heal',
+    GOTO: 'goto',                BRING: 'bring',
+    SPECTATE: 'spectate',        SCREENSHOT: 'camera',
+    SLAP: 'warn',                DM: 'adminchat',
+    GIVE_ITEM: 'inventory',      REMOVE_ITEM: 'trash',
+    CLEAR_INVENTORY: 'trash',    STRIP_WEAPONS: 'weapon',
+    GIVE_WEAPON: 'weapon',       SPAWN_VEHICLE: 'spawner',
+    DELETE_VEHICLE: 'trash',     SET_JOB: 'job',
+    SET_CASH: 'money',           SET_BANK: 'money',
+    ANNOUNCEMENT: 'adminchat',   MASS_ANNOUNCE: 'adminchat',
+    SET_WEATHER: 'weather',      SET_TIME: 'clock',
+    ADD_NOTE: 'note',            ASSIGN_ROLE: 'permissions',
+    REMOVE_ROLE: 'trash',        EDIT_ROLE: 'permissions',
+    DELETE_CHARACTER: 'trash',   SUMMON_ALL: 'players',
+};
+
+function actionIcon(action, cls) {
+    return icon(CA_ACTION_ICONS[action] || 'audit', cls);
+}
+
+// `cls` lands on the <svg> so a caller can size one instance without a rule.
 function icon(name, cls) {
     const body = CA_ICONS[name];
     if (!body) return '';
@@ -108,17 +126,25 @@ function icon(name, cls) {
         stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 }
 
-window.icon = icon;
-window.CA_ICONS = CA_ICONS;
+// Every panel was hand-rolling this markup with a different emoji in it.
+function emptyState(iconName, text) {
+    return `<div class="empty-state"><div class="empty-icon">${icon(iconName)}</div>`
+         + `<div class="empty-text">${esc(text)}</div></div>`;
+}
+
+window.icon        = icon;
+window.actionIcon  = actionIcon;
+window.emptyState  = emptyState;
+window.CA_ICONS    = CA_ICONS;
 
 // ── Click delegation ────────────────────────────────────────────────────────
-// Panels declare intent in markup:
+// Markup declares intent:
 //   <button data-ca-action="playerAction" data-act="goto" data-src="3">
-// and register behaviour here:
+// and behaviour registers here:
 //   caAction('playerAction', (d) => playerAction(d.act, Number(d.src)));
 //
-// One listener on document handles every panel, so re-rendering a panel's
-// innerHTML never orphans a handler or needs rebinding.
+// One document listener serves every panel, so re-rendering a panel's
+// innerHTML never orphans a handler.
 const CA_ACTIONS = {};
 
 function caAction(name, handler) {
@@ -132,18 +158,15 @@ document.addEventListener('click', function (e) {
     const handler = CA_ACTIONS[el.dataset.caAction];
     if (!handler) return;
 
-    // Stops a row-level handler firing as well when a button inside it is
-    // what was actually clicked.
+    // Stops a row handler also firing when a button inside it was clicked.
     e.stopPropagation();
     handler(el.dataset, el, e);
 });
 
 window.caAction = caAction;
 
-// ── Nav icon hydration ──────────────────────────────────────────────────────
-// The sidebar markup carries data-icon names instead of literal glyphs, so the
-// icon set stays defined in exactly one place. Runs on DOMContentLoaded and is
-// safe to call again after any markup change.
+// Sidebar markup carries data-icon names, so the set stays defined in one
+// place. Safe to call again after any markup change.
 function hydrateIcons(root) {
     (root || document).querySelectorAll('[data-icon]').forEach((el) => {
         const name = el.dataset.icon;

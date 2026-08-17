@@ -1,11 +1,9 @@
-// Cipher-Admin -- Self Actions Panel
+// Cipher-Admin — Self Actions Panel
 //
-// The action grid is generated from the SELF_ACTIONS registry below rather
-// than hand-written in index.html. The panel previously carried ~23 buttons
-// as literal markup, which meant every new action needed a block of HTML, a
-// routing line, and a Lua branch kept in sync by hand — the reason it had
-// stopped growing. Adding one now is a single registry entry plus its Lua
-// branch.
+// The grid is generated from the registry below rather than hand-written in
+// index.html, where every new action needed markup, a routing line and a Lua
+// branch kept in sync by hand. Adding one is now a registry entry plus its
+// Lua branch.
 //
 // Fields:
 //   key      matches the `action` string handled in client/main.lua
@@ -13,7 +11,9 @@
 //   ui       handled entirely in the NUI (opens a modal / switches panel);
 //            never reaches Lua
 //   danger   styled as destructive
-var SELF_ACTIONS = [
+//   perm     hides the card unless the admin holds it. Most self actions
+//            affect only the clicker; arming yourself is the exception.
+const SELF_ACTIONS = [
     // ── Personal ──
     { sec: 'Personal', key: 'godmode',     label: 'God Mode',      desc: 'Toggle invincibility',       ico: 'shield', toggle: true },
     { sec: 'Personal', key: 'heal',        label: 'Heal',          desc: 'Full health & armour',       ico: 'heal' },
@@ -25,6 +25,15 @@ var SELF_ACTIONS = [
     { sec: 'Personal', key: 'noragdoll',   label: 'No Ragdoll',    desc: 'Stay on your feet',          ico: 'self', toggle: true },
     { sec: 'Personal', key: 'clearwanted', label: 'Clear Wanted',  desc: 'Drop wanted level to zero',  ico: 'check' },
     { sec: 'Personal', key: 'setwanted',   label: 'Set Wanted',    desc: 'Choose a star level',        ico: 'warn', ui: true },
+    { sec: 'Personal', key: 'freezeself',  label: 'Freeze Self',   desc: 'Lock yourself in place',     ico: 'freeze', toggle: true },
+    { sec: 'Personal', key: 'killself',    label: 'Kill Self',     desc: 'Test the death & EMS flow',  ico: 'warn', danger: true },
+
+    // Gated on `giveweapon` — the one self action that changes what you can do
+    // to other players.
+    { sec: 'Weapons', key: 'giveallweapons', label: 'All Weapons',     desc: 'Give yourself every weapon', ico: 'weapon', perm: 'giveweapon' },
+    { sec: 'Weapons', key: 'refillammo',     label: 'Refill Ammo',     desc: 'Top up everything you carry', ico: 'weapon', perm: 'giveweapon' },
+    { sec: 'Weapons', key: 'infammo',        label: 'Infinite Ammo',   desc: 'Never reload',               ico: 'weapon', perm: 'giveweapon', toggle: true },
+    { sec: 'Weapons', key: 'removeweapons',  label: 'Remove Weapons',  desc: 'Strip your loadout',         ico: 'trash', perm: 'giveweapon', danger: true },
 
     // ── Appearance ──
     { sec: 'Appearance', key: 'invisible',  label: 'Invisible',    desc: 'Toggle visibility',          ico: 'spectate', toggle: true },
@@ -43,6 +52,9 @@ var SELF_ACTIONS = [
     { sec: 'Movement', key: 'savepos',     label: 'Save Position', desc: 'Remember where you are',     ico: 'note' },
     { sec: 'Movement', key: 'loadpos',     label: 'Load Position', desc: 'Return to saved spot',       ico: 'goto' },
     { sec: 'Movement', key: 'tpback',      label: 'Undo Teleport', desc: 'Back to previous location',  ico: 'refresh' },
+    { sec: 'Movement', key: 'landmark',    label: 'To Landmark',   desc: 'Jump to a known location',   ico: 'map', ui: true },
+    { sec: 'Movement', key: 'lastdeath',   label: 'To Last Death', desc: 'Where you died most recently', ico: 'revive' },
+    { sec: 'Movement', key: 'tpveh',       label: 'Into Vehicle',  desc: 'Seat yourself in the nearest', ico: 'spawner' },
 
     // ── Vehicle ──
     { sec: 'Vehicle', key: 'spawner',    label: 'Spawn Vehicle', desc: 'Open the vehicle spawner',   ico: 'spawner', ui: true },
@@ -54,6 +66,9 @@ var SELF_ACTIONS = [
     { sec: 'Vehicle', key: 'cleanveh',   label: 'Clean',         desc: 'Wash off dirt and decals',   ico: 'check' },
     { sec: 'Vehicle', key: 'vehgod',     label: 'Vehicle God',   desc: 'Indestructible vehicle',     ico: 'shield', toggle: true },
     { sec: 'Vehicle', key: 'setplate',   label: 'Set Plate',     desc: 'Change the licence plate',   ico: 'note', ui: true },
+    { sec: 'Vehicle', key: 'engine',     label: 'Engine',        desc: 'Toggle the engine on or off', ico: 'refresh', toggle: true },
+    { sec: 'Vehicle', key: 'vehcolour',  label: 'Colour',        desc: 'Repaint primary & secondary', ico: 'entities', ui: true },
+    { sec: 'Vehicle', key: 'vehdoors',   label: 'Doors',         desc: 'Open or close any door',     ico: 'kick', ui: true },
     { sec: 'Vehicle', key: 'deleteveh',  label: 'Delete',        desc: 'Remove nearest vehicle',     ico: 'trash', danger: true },
 
     // ── World ──
@@ -64,6 +79,7 @@ var SELF_ACTIONS = [
     { sec: 'World', key: 'announce',   label: 'Announce',     desc: 'Broadcast to everyone',       ico: 'adminchat', ui: true },
     { sec: 'World', key: 'traffic',    label: 'Traffic',      desc: 'Set vehicle density',         ico: 'spawner', ui: true },
     { sec: 'World', key: 'peddensity', label: 'Pedestrians',  desc: 'Set pedestrian density',      ico: 'players', ui: true },
+    { sec: 'World', key: 'slowmo',     label: 'Time Scale',   desc: 'Slow the world down',         ico: 'clock', ui: true },
 
     // ── Area ──
     { sec: 'Area', key: 'cleararea',     label: 'Clear Area',     desc: 'Wipe everything nearby',    ico: 'trash', danger: true },
@@ -77,22 +93,31 @@ var SELF_ACTIONS = [
     { sec: 'Utility', key: 'copyvec3',   label: 'Copy Vector3',  desc: 'Position only',              ico: 'note', ui: true },
     { sec: 'Utility', key: 'entityinfo', label: 'Entity Info',   desc: 'Inspect what you look at',   ico: 'search' },
     { sec: 'Utility', key: 'spawnprop',  label: 'Spawn Prop',    desc: 'Place an object',            ico: 'inventory', ui: true },
+    { sec: 'Utility', key: 'nametags',   label: 'Name Tags',     desc: 'Names and IDs above players', ico: 'tag', toggle: true },
+    { sec: 'Utility', key: 'playerblips', label: 'Player Blips', desc: 'Map blips for players in scope', ico: 'map', toggle: true },
+    { sec: 'Utility', key: 'devhud',     label: 'Dev HUD',       desc: 'Live coords, heading and FPS', ico: 'stats', toggle: true },
 ];
 
-// Toggle state lives here rather than in a handful of loose booleans so the
-// renderer can ask about any key without a lookup table per action.
-var _selfToggles = {};
+// Keyed state rather than loose booleans, so the renderer can ask about any
+// key without a lookup table per action.
+const _selfToggles = {};
 
 function renderSelfPanel() {
-    var panel = document.getElementById('panel-self');
+    const panel = document.getElementById('panel-self');
     if (!panel) return;
 
-    var sections = [];
-    SELF_ACTIONS.forEach(function (a) {
+    // Filtered before sections are collected, so a fully hidden section never
+    // renders an empty heading.
+    const visible = SELF_ACTIONS.filter(function (a) {
+        return !a.perm || hasPermission(a.perm);
+    });
+
+    const sections = [];
+    visible.forEach(function (a) {
         if (sections.indexOf(a.sec) === -1) sections.push(a.sec);
     });
 
-    var html = '<div class="section-header mb-12"><div>'
+    let html = '<div class="section-header mb-12"><div>'
         + '<div class="section-title">Self Actions</div>'
         + '<div class="section-sub">Quick commands targeting yourself &mdash; right-click any card to pin it</div>'
         + '</div><div class="search-wrap" style="width:220px">'
@@ -104,7 +129,7 @@ function renderSelfPanel() {
         + '</div>';
 
     sections.forEach(function (sec) {
-        var cards = SELF_ACTIONS.filter(function (a) { return a.sec === sec; }).map(selfCardHtml).join('');
+        const cards = visible.filter(function (a) { return a.sec === sec; }).map(selfCardHtml).join('');
         html += '<div class="self-section" data-section="' + escAttr(sec) + '">'
             + '<div class="self-section-title">' + esc(sec) + '</div>'
             + '<div class="self-action-grid">' + cards + '</div></div>';
@@ -112,14 +137,14 @@ function renderSelfPanel() {
 
     panel.innerHTML = html;
 
-    var filter = document.getElementById('self-filter');
+    const filter = document.getElementById('self-filter');
     if (filter) filter.oninput = function () { selfFilter(this.value); };
 
     _renderFavsBar();
 }
 
 function selfCardHtml(a) {
-    var on = _selfToggles[a.key];
+    const on = _selfToggles[a.key];
     return '<button class="self-action-card' + (on ? ' active' : '') + (a.danger ? ' danger' : '') + '"'
         + ' id="sa-' + escAttr(a.key) + '"'
         + ' data-ca-action="selfCard" data-key="' + escAttr(a.key) + '"'
@@ -131,16 +156,15 @@ function selfCardHtml(a) {
         + '</button>';
 }
 
-// Filters on the precomputed data-search string so it matches label, blurb
-// and section without touching the DOM text of every card.
+// Matches the precomputed data-search string, not the DOM text of every card.
 function selfFilter(q) {
-    var needle = (q || '').trim().toLowerCase();
+    const needle = (q || '').trim().toLowerCase();
     document.querySelectorAll('#panel-self .self-action-card').forEach(function (card) {
         card.style.display = (!needle || (card.dataset.search || '').indexOf(needle) !== -1) ? '' : 'none';
     });
     // Hide a whole section once every card in it is filtered out.
     document.querySelectorAll('#panel-self .self-section').forEach(function (sec) {
-        var any = [].slice.call(sec.querySelectorAll('.self-action-card'))
+        const any = [].slice.call(sec.querySelectorAll('.self-action-card'))
             .some(function (c) { return c.style.display !== 'none'; });
         sec.style.display = any ? '' : 'none';
     });
@@ -148,25 +172,24 @@ function selfFilter(q) {
 
 caAction('selfCard', function (d) { selfBtn(d.key); });
 
-// Right-click pins to Favorites. Registered once on the panel rather than
-// per-card so it survives re-renders.
+// Right-click pins to Favourites. Registered once so it survives re-renders.
 document.addEventListener('contextmenu', function (e) {
-    var card = e.target.closest && e.target.closest('#panel-self .self-action-card');
+    const card = e.target.closest && e.target.closest('#panel-self .self-action-card');
     if (!card) return;
     e.preventDefault();
-    var def = SELF_ACTIONS.find(function (a) { return a.key === card.dataset.key; });
+    const def = SELF_ACTIONS.find(function (a) { return a.key === card.dataset.key; });
     if (def) selfToggleFav(def.key, def.label, def.ico, e);
 });
 
 window.renderSelfPanel = renderSelfPanel;
 window.SELF_ACTIONS = SELF_ACTIONS;
 
-var _godModeActive   = false;
-var _noclipActive    = false;
-var _invisibleActive = false;
+const _godModeActive   = false;
+const _noclipActive    = false;
+const _invisibleActive = false;
 
 function selfBtn(key) {
-    var def = SELF_ACTIONS.find(function (a) { return a.key === key; });
+    const def = SELF_ACTIONS.find(function (a) { return a.key === key; });
 
     // NUI-only actions never reach Lua.
     if (key === 'spawner')    { switchPanel('spawner'); return; }
@@ -183,13 +206,17 @@ function selfBtn(key) {
     if (key === 'announce')   { selfAnnounceModal(); return; }
     if (key === 'weather')    { selfWeatherModal(); return; }
     if (key === 'settime')    { selfTimeModal(); return; }
+    if (key === 'landmark')   { selfLandmarkModal(); return; }
+    if (key === 'vehcolour')  { selfColourModal(); return; }
+    if (key === 'vehdoors')   { selfDoorsModal(); return; }
+    if (key === 'slowmo')     { selfSlowmoModal(); return; }
 
     if (def && def.toggle) {
         _selfToggles[key] = !_selfToggles[key];
-        var btn = document.getElementById('sa-' + key);
+        const btn = document.getElementById('sa-' + key);
         if (btn) {
             btn.classList.toggle('active', _selfToggles[key]);
-            var st = btn.querySelector('.sa-state');
+            const st = btn.querySelector('.sa-state');
             if (st) st.textContent = _selfToggles[key] ? 'ON' : 'OFF';
         }
     }
@@ -202,14 +229,14 @@ function selfBtn(key) {
 }
 
 function _selfSend(action, extra) {
-    var body = Object.assign({ action: action }, extra || {});
+    const body = Object.assign({ action: action }, extra || {});
     fetch('https://cipher-admin/selfAction', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
     });
 }
 
 function selfWantedModal() {
-    var opts = [0,1,2,3,4,5].map(function (n) {
+    const opts = [0,1,2,3,4,5].map(function (n) {
         return '<option value="' + n + '">' + (n === 0 ? 'Clear (0 stars)' : n + ' star' + (n > 1 ? 's' : '')) + '</option>';
     }).join('');
     openModal('Set Wanted Level',
@@ -218,23 +245,24 @@ function selfWantedModal() {
         + '<button class="btn btn-primary" data-ca-action="applyWanted">Apply</button>');
 }
 caAction('applyWanted', function () {
-    var v = parseInt((document.getElementById('wanted-sel') || {}).value) || 0;
+    const v = parseInt((document.getElementById('wanted-sel') || {}).value) || 0;
     closeModal();
     _selfSend('setwanted', { level: v });
 });
 
 function selfWalkModal() {
-    var styles = ['move_m@casual@a','move_m@confident','move_m@business@a','move_m@tough_guy@',
-                  'move_f@sexy@a','move_m@injured','move_m@drunk@moderatedrunk','move_m@hurry@a',
-                  'move_m@swagger','move_m@gangster@generic','RESET'];
-    var opts = styles.map(function (s) { return '<option value="' + escAttr(s) + '">' + esc(s) + '</option>'; }).join('');
+    const styles = _selfList('walkStyles',
+        ['move_m@casual@a','move_m@confident','move_m@business@a','move_m@tough_guy@',
+         'move_f@sexy@a','move_m@injured','move_m@drunk@moderatedrunk','move_m@hurry@a',
+         'move_m@swagger','move_m@gangster@generic','RESET']);
+    const opts = styles.map(function (s) { return '<option value="' + escAttr(s) + '">' + esc(s) + '</option>'; }).join('');
     openModal('Walk Style',
         '<div class="form-group"><label>Clipset</label><select class="select" id="walk-sel">' + opts + '</select></div>',
         '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
         + '<button class="btn btn-primary" data-ca-action="applyWalk">Apply</button>');
 }
 caAction('applyWalk', function () {
-    var v = (document.getElementById('walk-sel') || {}).value || 'RESET';
+    const v = (document.getElementById('walk-sel') || {}).value || 'RESET';
     closeModal();
     _selfSend('walkstyle', { style: v });
 });
@@ -250,10 +278,10 @@ function selfCoordsModal() {
 
     // Convenience: pasting a whole "vector4(1.0, 2.0, 3.0, 4.0)" into X splits
     // it across the fields rather than making you separate it by hand.
-    var x = document.getElementById('tp-x');
+    const x = document.getElementById('tp-x');
     if (x) x.addEventListener('paste', function (ev) {
-        var txt = (ev.clipboardData || window.clipboardData).getData('text') || '';
-        var nums = txt.match(/-?\d+(\.\d+)?/g);
+        const txt = (ev.clipboardData || window.clipboardData).getData('text') || '';
+        const nums = txt.match(/-?\d+(\.\d+)?/g);
         if (nums && nums.length >= 3) {
             ev.preventDefault();
             document.getElementById('tp-x').value = nums[0];
@@ -263,8 +291,8 @@ function selfCoordsModal() {
     });
 }
 caAction('applyCoords', function () {
-    var g = function (id) { return parseFloat((document.getElementById(id) || {}).value); };
-    var x = g('tp-x'), y = g('tp-y'), z = g('tp-z');
+    const g = function (id) { return parseFloat((document.getElementById(id) || {}).value); };
+    const x = g('tp-x'), y = g('tp-y'), z = g('tp-z');
     if (isNaN(x) || isNaN(y) || isNaN(z)) return;
     closeModal();
     _selfSend('tpcoords', { x: x, y: y, z: z });
@@ -277,14 +305,14 @@ function selfPlateModal() {
         + '<button class="btn btn-primary" data-ca-action="applyPlate">Apply</button>');
 }
 caAction('applyPlate', function () {
-    var v = ((document.getElementById('plate-inp') || {}).value || '').trim();
+    const v = ((document.getElementById('plate-inp') || {}).value || '').trim();
     if (!v) return;
     closeModal();
     _selfSend('setplate', { plate: v });
 });
 
 function selfDensityModal(action, title) {
-    var opts = [['0','Off (0%)'],['0.25','Low (25%)'],['0.5','Half (50%)'],['1','Normal (100%)']]
+    const opts = [['0','Off (0%)'],['0.25','Low (25%)'],['0.5','Half (50%)'],['1','Normal (100%)']]
         .map(function (o) { return '<option value="' + o[0] + '">' + o[1] + '</option>'; }).join('');
     openModal(title,
         '<div class="form-group"><label>Density</label><select class="select" id="dens-sel">' + opts + '</select></div>'
@@ -293,10 +321,128 @@ function selfDensityModal(action, title) {
         + '<button class="btn btn-primary" data-ca-action="applyDensity" data-act="' + escAttr(action) + '">Apply</button>');
 }
 caAction('applyDensity', function (d) {
-    var v = parseFloat((document.getElementById('dens-sel') || {}).value);
+    const v = parseFloat((document.getElementById('dens-sel') || {}).value);
     if (isNaN(v)) return;
     closeModal();
     _selfSend(d.act, { value: v });
+});
+
+// ── Server-configurable pick lists ───────────────────────────────────────────
+// These come from config.lua with the open payload. The arrays below are
+// fallbacks for a config.lua predating those keys — without them an old config
+// renders empty dropdowns rather than ignoring a setting it never made.
+function _selfList(name, fallback) {
+    const l = (CA.lists || {})[name];
+    return (Array.isArray(l) && l.length) ? l : fallback;
+}
+
+// ── Landmarks ────────────────────────────────────────────────────────────────
+const SELF_LANDMARKS = [
+    { name: 'Legion Square',      x: 195.0,   y: -933.0,  z: 30.7 },
+    { name: 'Mission Row PD',     x: 441.0,   y: -982.0,  z: 30.7 },
+    { name: 'Pillbox Hospital',   x: 298.0,   y: -584.0,  z: 43.3 },
+    { name: 'Los Santos Customs', x: -337.0,  y: -136.0,  z: 39.0 },
+    { name: 'LS International',   x: -1037.0, y: -2737.0, z: 20.2 },
+    { name: 'Del Perro Pier',     x: -1850.0, y: -1231.0, z: 13.0 },
+    { name: 'Vespucci Beach',     x: -1223.0, y: -1493.0, z: 4.3  },
+    { name: 'Maze Bank Roof',     x: -75.0,   y: -818.0,  z: 326.2 },
+    { name: 'Diamond Casino',     x: 925.0,   y: 46.0,    z: 81.1 },
+    { name: 'Vinewood Sign',      x: 711.0,   y: 1198.0,  z: 348.5 },
+    { name: 'Bolingbroke Prison', x: 1845.0,  y: 2585.0,  z: 45.0 },
+    { name: 'Sandy Shores',       x: 1853.0,  y: 3689.0,  z: 34.3 },
+    { name: 'Grapeseed',          x: 1698.0,  y: 4924.0,  z: 42.0 },
+    { name: 'Paleto Bay',         x: -448.0,  y: 6008.0,  z: 31.7 },
+    { name: 'Mount Chiliad',      x: 450.0,   y: 5566.0,  z: 806.2 },
+    { name: 'Cayo Perico',        x: 4840.0,  y: -5175.0, z: 2.0  },
+];
+
+function selfLandmarkModal() {
+    const list = _selfList('landmarks', SELF_LANDMARKS);
+    const opts = list.map(function (l, i) {
+        return '<option value="' + i + '">' + esc(l.name) + '</option>';
+    }).join('');
+    openModal('Teleport to Landmark',
+        '<div class="form-group"><label>Location</label><select class="select" id="lm-sel">' + opts + '</select></div>'
+        + '<div style="font-size:11px;color:var(--text-muted)">Undo Teleport will bring you back.</div>',
+        '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
+        + '<button class="btn btn-primary" data-ca-action="applyLandmark">Teleport</button>');
+}
+caAction('applyLandmark', function () {
+    const i = parseInt((document.getElementById('lm-sel') || {}).value);
+    const l = _selfList('landmarks', SELF_LANDMARKS)[i];
+    if (!l) return;
+    closeModal();
+    _selfSend('tpcoords', { x: l.x, y: l.y, z: l.z });
+});
+
+// A shortlist, not all 160 indices — three clicks to something photogenic or
+// identifiable. Los Santos Customs exists for the full range.
+const SELF_COLOURS = [
+    ['0', 'Black'], ['1', 'Graphite'], ['4', 'Silver'], ['111', 'White'],
+    ['27', 'Red'], ['38', 'Orange'], ['88', 'Yellow'], ['55', 'Lime'],
+    ['49', 'Dark Green'], ['64', 'Sea Wash'], ['70', 'Blue'], ['73', 'Light Blue'],
+    ['145', 'Purple'], ['135', 'Hot Pink'], ['90', 'Gold'], ['117', 'Brushed Steel'],
+];
+
+function selfColourModal() {
+    // Config supplies {id, name}, the fallback is [id, name] — normalised here
+    // rather than in two render paths.
+    const list = _selfList('vehicleColours', null);
+    const opts = (list
+        ? list.map(function (c) { return [String(c.id), c.name]; })
+        : SELF_COLOURS
+    ).map(function (c) {
+        return '<option value="' + escNum(c[0]) + '">' + esc(c[1]) + '</option>';
+    }).join('');
+    openModal('Vehicle Colour',
+        '<div class="form-group"><label>Primary</label><select class="select" id="col-p">' + opts + '</select></div>'
+        + '<div class="form-group"><label>Secondary</label><select class="select" id="col-s">' + opts + '</select></div>'
+        + '<div style="font-size:11px;color:var(--text-muted)">Applies to the vehicle you are in, or the nearest one.</div>',
+        '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
+        + '<button class="btn btn-primary" data-ca-action="applyColour">Apply</button>');
+}
+caAction('applyColour', function () {
+    const p = parseInt((document.getElementById('col-p') || {}).value);
+    const s = parseInt((document.getElementById('col-s') || {}).value);
+    if (isNaN(p) || isNaN(s)) return;
+    closeModal();
+    _selfSend('vehcolour', { primary: p, secondary: s });
+});
+
+// ── Vehicle doors ────────────────────────────────────────────────────────────
+function selfDoorsModal() {
+    const doors = [['-1','All doors'],['0','Front left'],['1','Front right'],['2','Rear left'],
+                 ['3','Rear right'],['4','Bonnet'],['5','Boot']];
+    const opts = doors.map(function (d) { return '<option value="' + d[0] + '">' + d[1] + '</option>'; }).join('');
+    openModal('Vehicle Doors',
+        '<div class="form-group"><label>Door</label><select class="select" id="door-sel">' + opts + '</select></div>',
+        '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
+        + '<button class="btn btn-ghost" data-ca-action="applyDoors" data-open="0">Close</button>'
+        + '<button class="btn btn-primary" data-ca-action="applyDoors" data-open="1">Open</button>');
+}
+caAction('applyDoors', function (d) {
+    const door = parseInt((document.getElementById('door-sel') || {}).value);
+    if (isNaN(door)) return;
+    closeModal();
+    _selfSend('vehdoors', { door: door, open: d.open === '1' });
+});
+
+// ── Time scale ───────────────────────────────────────────────────────────────
+function selfSlowmoModal() {
+    const opts = [['1.0','Normal (100%)'],['0.5','Half (50%)'],['0.25','Quarter (25%)'],['0.1','Crawl (10%)']]
+        .map(function (o) { return '<option value="' + o[0] + '">' + o[1] + '</option>'; }).join('');
+    openModal('Time Scale',
+        '<div class="form-group"><label>Speed</label><select class="select" id="ts-sel">' + opts + '</select></div>'
+        + '<div style="font-size:11px;color:var(--text-muted)">Client-side only &mdash; nobody else slows down. '
+        + 'Useful for watching a collision or a suspected cheat frame by frame.</div>',
+        '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
+        + '<button class="btn btn-primary" data-ca-action="applySlowmo">Apply</button>');
+}
+caAction('applySlowmo', function () {
+    const v = parseFloat((document.getElementById('ts-sel') || {}).value);
+    if (isNaN(v)) return;
+    closeModal();
+    _selfSend('slowmo', { value: v });
 });
 
 function selfCopyVector(action) {
@@ -306,7 +452,7 @@ function selfCopyVector(action) {
         body: JSON.stringify({ action: action || 'copyvector' })
     }).then(function(r) { return r.text(); }).then(function(t) {
         if (!t || !t.trim()) return;
-        var d = JSON.parse(t);
+        const d = JSON.parse(t);
         if (!d || !d.vector) return;
         _copyUrl(d.vector);
         openModal('Current Vector',
@@ -316,9 +462,15 @@ function selfCopyVector(action) {
 }
 
 function selfPedModelModal() {
-    var peds = 'mp_m_freemode_01,mp_f_freemode_01,a_m_m_beach_01,a_f_m_beach_01,s_m_m_cop_01,s_m_m_paramedic_01,s_m_m_doctor_01,u_m_m_prolsec,g_m_y_lost_01,player_zero,player_one,player_two'.split(',');
-    var rows = peds.map(function(p) {
-        return '<div class="profile-row" style="cursor:pointer" onclick="document.getElementById(\'ped-inp\').value=\'' + p + '\'">' + p + '</div>';
+    const peds = _selfList('pedModels',
+        ['mp_m_freemode_01','mp_f_freemode_01','a_m_m_beach_01','a_f_m_beach_01',
+         's_m_m_cop_01','s_m_m_paramedic_01','s_m_m_doctor_01','u_m_m_prolsec',
+         'g_m_y_lost_01','player_zero','player_one','player_two']);
+    // Delegated: these come from config.lua now, and an apostrophe in a model
+    // name would break the row if it were interpolated into an inline handler.
+    const rows = peds.map(function (p) {
+        return '<div class="profile-row" style="cursor:pointer" data-ca-action="pickPed"'
+            + ' data-model="' + escAttr(p) + '">' + esc(p) + '</div>';
     }).join('');
     openModal('Set Ped Model',
         '<div class="form-group"><label>Model Name</label><input class="input" id="ped-inp" placeholder="e.g. mp_m_freemode_01"></div>'
@@ -326,8 +478,13 @@ function selfPedModelModal() {
         '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
         + '<button class="btn btn-primary" onclick="selfApplyPed()">Apply</button>');
 }
+caAction('pickPed', function (d) {
+    const inp = document.getElementById('ped-inp');
+    if (inp) inp.value = d.model || '';
+});
+
 window.selfApplyPed = function() {
-    var m = (document.getElementById('ped-inp') || {}).value || '';
+    const m = (document.getElementById('ped-inp') || {}).value || '';
     if (!m) return;
     closeModal();
     fetch('https://cipher-admin/selfAction', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'pedmodel', model: m }) });
@@ -341,8 +498,8 @@ function selfPropModal() {
         + '<button class="btn btn-primary" onclick="selfApplyProp()">Spawn</button>');
 }
 window.selfApplyProp = function() {
-    var m = (document.getElementById('prop-inp') || {}).value || '';
-    var f = document.getElementById('prop-frz') ? document.getElementById('prop-frz').checked : true;
+    const m = (document.getElementById('prop-inp') || {}).value || '';
+    const f = document.getElementById('prop-frz') ? document.getElementById('prop-frz').checked : true;
     if (!m) return;
     closeModal();
     fetch('https://cipher-admin/selfAction', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'spawnprop', model: m, frozen: f }) });
@@ -356,23 +513,23 @@ function selfAnnounceModal() {
         + '<button class="btn btn-primary" onclick="selfSendAnnounce()">Send</button>');
 }
 window.selfSendAnnounce = function() {
-    var msg  = (document.getElementById('ann-msg')  || {}).value || '';
-    var type = (document.getElementById('ann-type') || {}).value || 'inform';
+    const msg  = (document.getElementById('ann-msg')  || {}).value || '';
+    let type = (document.getElementById('ann-type') || {}).value || 'inform';
     if (!msg) return;
     caFetch('cipher-admin:server:announce', { message: msg, type: type });
     closeModal();
 };
 
 function selfWeatherModal() {
-    var ws = ['EXTRASUNNY','CLEAR','CLOUDS','SMOG','FOGGY','OVERCAST','RAIN','THUNDER','CLEARING','NEUTRAL','SNOW','BLIZZARD','SNOWLIGHT','XMAS','HALLOWEEN'];
-    var opts = ws.map(function(w) { return '<option value="' + w + '">' + w + '</option>'; }).join('');
+    const ws = ['EXTRASUNNY','CLEAR','CLOUDS','SMOG','FOGGY','OVERCAST','RAIN','THUNDER','CLEARING','NEUTRAL','SNOW','BLIZZARD','SNOWLIGHT','XMAS','HALLOWEEN'];
+    const opts = ws.map(function(w) { return '<option value="' + w + '">' + w + '</option>'; }).join('');
     openModal('Set Weather',
         '<div class="form-group"><label>Weather</label><select class="select" id="wx-sel">' + opts + '</select></div>',
         '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
         + '<button class="btn btn-primary" onclick="selfApplyWeather()">Apply</button>');
 }
 window.selfApplyWeather = function() {
-    var w = (document.getElementById('wx-sel') || {}).value;
+    const w = (document.getElementById('wx-sel') || {}).value;
     if (!w) return;
     caFetch('cipher-admin:server:setWeather', { weather: w });
     closeModal();
@@ -386,8 +543,8 @@ function selfTimeModal() {
         + '<button class="btn btn-primary" onclick="selfApplyTime()">Apply</button>');
 }
 window.selfApplyTime = function() {
-    var h = parseInt((document.getElementById('t-hr') || {}).value) || 12;
-    var m = parseInt((document.getElementById('t-mn') || {}).value) || 0;
+    const h = parseInt((document.getElementById('t-hr') || {}).value) || 12;
+    const m = parseInt((document.getElementById('t-mn') || {}).value) || 0;
     caFetch('cipher-admin:server:setTime', { hour: h, minute: m });
     closeModal();
 };

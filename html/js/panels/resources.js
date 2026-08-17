@@ -1,10 +1,10 @@
 // Cipher-Admin — Resource Manager Panel
 
-var _resourceFilter = '';
-var _resourceList   = [];
+let _resourceFilter = '';
+let _resourceList   = [];
 
 function loadResources() {
-    var panel = document.getElementById('panel-resources');
+    const panel = document.getElementById('panel-resources');
     if (!panel) return;
 
     caFetch('cipher-admin:server:getResources', {}).then(function(data) {
@@ -14,27 +14,29 @@ function loadResources() {
 }
 
 function renderResourcesTable() {
-    var panel = document.getElementById('panel-resources');
+    const panel = document.getElementById('panel-resources');
     if (!panel) return;
 
-    var list = _resourceList;
+    let list = _resourceList;
     if (_resourceFilter) {
-        var q = _resourceFilter.toLowerCase();
+        const q = _resourceFilter.toLowerCase();
         list = list.filter(function(r) { return r.name.toLowerCase().indexOf(q) !== -1; });
     }
 
-    var stateColor = { started: 'var(--green)', stopped: 'var(--red)', starting: 'var(--amber)', stopping: 'var(--amber)', uninitialized: 'var(--text-muted)', missing: 'var(--red)' };
+    const stateColor = { started: 'var(--green)', stopped: 'var(--red)', starting: 'var(--amber)', stopping: 'var(--amber)', uninitialized: 'var(--text-muted)', missing: 'var(--red)' };
 
-    var rows = '';
-    for (var i = 0; i < list.length; i++) {
-        var r = list[i];
-        var color = stateColor[r.state] || 'var(--text-muted)';
-        var canRestart = hasPermission('restartresource') && r.state === 'started';
+    let rows = '';
+    for (let i = 0; i < list.length; i++) {
+        const r = list[i];
+        const color = stateColor[r.state] || 'var(--text-muted)';
+        const canRestart = hasPermission('restartresource') && r.state === 'started';
         rows += '<tr>'
-              + '<td><span style="font-family:monospace;font-size:12px">' + r.name + '</span></td>'
-              + '<td><span class="res-state-dot" style="background:' + color + '"></span><span style="color:' + color + '">' + r.state + '</span></td>'
+              + '<td><span class="mono">' + esc(r.name) + '</span></td>'
+              + '<td><span class="res-state-dot" style="background:' + color + '"></span><span style="color:' + color + '">' + esc(r.state) + '</span></td>'
               + '<td style="text-align:right">'
-              + (canRestart ? '<button class="btn btn-ghost btn-xs" onclick="confirmRestartResource(\'' + r.name + '\')">&#x21BA; Restart</button>' : '')
+              + (canRestart
+                  ? '<button class="btn btn-ghost btn-xs" data-ca-action="resRestart" data-name="' + escAttr(r.name) + '">&#x21BA; Restart</button>'
+                  : '')
               + '</td>'
               + '</tr>';
     }
@@ -57,10 +59,14 @@ function renderResourcesTable() {
 }
 
 function confirmRestartResource(name) {
-    openModal('Restart Resource', '<p style="color:var(--text-secondary)">Restart <strong style="color:var(--text-primary)">' + name + '</strong>? Players using this resource may be affected.</p>',
+    openModal('Restart Resource',
+        '<p style="color:var(--text-secondary)">Restart <strong style="color:var(--text-primary)">' + esc(name) + '</strong>? Players using this resource may be affected.</p>',
         '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
-        + '<button class="btn btn-amber" onclick="doRestartResource(\'' + name + '\')">&#x21BA; Restart</button>');
+        + '<button class="btn btn-amber" data-ca-action="resDoRestart" data-name="' + escAttr(name) + '">&#x21BA; Restart</button>');
 }
+
+caAction('resRestart',   (d) => confirmRestartResource(d.name));
+caAction('resDoRestart', (d) => doRestartResource(d.name));
 
 function doRestartResource(name) {
     closeModal();

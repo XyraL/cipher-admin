@@ -1,7 +1,7 @@
 // Cipher-Admin — Server Stats Panel
 
 function loadStats() {
-    var panel = document.getElementById('panel-stats');
+    const panel = document.getElementById('panel-stats');
     if (!panel) return;
 
     panel.innerHTML = '<div class="empty-state"><div class="empty-icon">&#x23F3;</div><div class="empty-text">Loading stats...</div></div>';
@@ -22,18 +22,18 @@ function loadStats() {
 }
 
 function renderStats(panel, d) {
-    var uptime  = _fmtUptime(d.uptimeSeconds || 0);
-    var players  = d.playerCount   || 0;
-    var maxPlayers = d.maxPlayers  || 32;
-    var fillPct = Math.min(Math.round((players / Math.max(maxPlayers, 1)) * 100), 100);
-    var started = d.resourcesStarted || 0;
-    var total   = d.resourceCount    || 1;
-    var resPct  = Math.round((started / Math.max(total, 1)) * 100);
+    const uptime  = _fmtUptime(d.uptimeSeconds || 0);
+    const players  = d.playerCount   || 0;
+    const maxPlayers = d.maxPlayers  || 32;
+    const fillPct = Math.min(Math.round((players / Math.max(maxPlayers, 1)) * 100), 100);
+    const started = d.resourcesStarted || 0;
+    const total   = d.resourceCount    || 1;
+    const resPct  = Math.round((started / Math.max(total, 1)) * 100);
 
     panel.innerHTML =
         '<div class="section-header mb-12">'
         + '<div><div class="section-title">Server Stats</div>'
-        + '<div class="section-sub">' + _escStat(d.serverName || 'Unknown') + '</div></div>'
+        + '<div class="section-sub">' + esc(d.serverName || 'Unknown') + '</div></div>'
         + '<button class="btn btn-ghost btn-sm" onclick="loadStats()">&#x21BB; Refresh</button>'
         + '</div>'
 
@@ -87,16 +87,13 @@ function _barHtml(pct, color) {
 }
 
 function _fmtUptime(secs) {
-    var d = Math.floor(secs / 86400);
-    var h = Math.floor((secs % 86400) / 3600);
-    var m = Math.floor((secs % 3600) / 60);
+    const d = Math.floor(secs / 86400);
+    const h = Math.floor((secs % 86400) / 3600);
+    const m = Math.floor((secs % 3600) / 60);
     if (d > 0) return d + 'd ' + h + 'h ' + m + 'm';
     if (h > 0) return h + 'h ' + m + 'm';
     return m + 'm';
 }
 
-function _escStat(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
 
 window.loadStats = loadStats;

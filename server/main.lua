@@ -1,19 +1,26 @@
 -- Cipher-Admin Server Core — permissions engine, auth, audit
 
--- ── Boot self-check ───────────────────────────────────────────────────────────
--- Names any server file that failed to load, instead of letting the symptom be
--- a stream of "attempt to index a nil value (global 'Framework')" from a dozen
--- unrelated line numbers.
---
--- This exists because that is exactly what happened on the 1.1.0 upgrade: the
--- release added a NEW directory (bridge/), the upgrade copied the changed
--- files but not the new folder, and every callback then failed pointing at
--- itself rather than at the missing file. New directories are the easiest
--- thing to miss when syncing a resource by hand.
+-- Names any server file that failed to load, rather than letting the symptom
+-- be a stream of "attempt to index a nil value (global 'Framework')" from a
+-- dozen unrelated line numbers. That is what a partial 1.1.0 upgrade looked
+-- like: the release added bridge/, the sync missed the new folder, and every
+-- callback failed pointing at itself instead of at the missing file.
 CreateThread(function()
+    -- Wait for the rest of the resource's server scripts to finish loading.
+    -- Files that load AFTER this one cannot have set their marker yet, and
+    -- checking too early would report every one of them as missing.
+    Wait(2000)
+
     local missing = {}
     if Framework == nil then missing[#missing + 1] = 'bridge/framework.lua' end
     if Config    == nil then missing[#missing + 1] = 'config.lua' end
+
+    -- 1.2.0 added two server files. Each sets a marker on load so a partial
+    -- upload is named here rather than surfacing as an unrelated nil index
+    -- somewhere else — which is exactly how the 1.1.0 bridge/ miss presented.
+    if CipherAdminThreats  == nil then missing[#missing + 1] = 'server/threats.lua'  end
+    if CipherAdminIdentity == nil then missing[#missing + 1] = 'server/identity.lua' end
+    if CipherAdminMutes    == nil then missing[#missing + 1] = 'server/mutes.lua'    end
 
     if #missing == 0 then return end
 
@@ -25,17 +32,11 @@ CreateThread(function()
     print('^1[cipher-admin] ─────────────────────────────────────────────^0')
 end)
 
--- ── Callback safety net ───────────────────────────────────────────────────────
--- Wraps every lib.callback.register in this resource so a handler that errors
--- still sends a response.
---
--- Without it, an unhandled error means cb() is never called, so the client's
--- await never returns, so the panel's fetch never settles and the tab sits
--- loading forever with no explanation. Patching the registrar covers every
--- callback across all seven server files, including any added later.
---
--- Placed at the top of the first server file that registers anything, so the
--- override is installed before any registration happens.
+-- Wraps every lib.callback.register so a handler that errors still responds.
+-- Without it an unhandled error means cb() is never called, the client's await
+-- never returns, and the panel sits loading forever. Patching the registrar
+-- covers every server file, including ones added later — so this has to sit in
+-- the first file that registers anything.
 do
     local _register = lib.callback.register
 
@@ -91,7 +92,9 @@ local function LoadRoles()
             name        = r.name,
             label       = r.label,
             color       = r.color,
-            permissions = ok and perms or {},
+            -- See getRoles. A nil table would make HasPermission error rather
+            -- than simply deny.
+            permissions = (ok and type(perms) == 'table') and perms or {},
         }
     end
 end
@@ -179,7 +182,7 @@ local function Audit(adminSrc, action, targetName, targetCid, details)
     if Config.AuditWebhook ~= '' then
         PerformHttpRequest(Config.AuditWebhook, function() end, 'POST', json.encode({
             embeds = {{
-                title  = '🔨 Cipher-Admin: ' .. action,
+                title  = 'Cipher-Admin: ' .. action,
                 color  = 15158332,
                 fields = {
                     { name = 'Admin',   value = aName or 'N/A',      inline = true },
@@ -277,6 +280,17 @@ lib.callback.register('cipher-admin:server:open', function(src)
         quickWarnReasons = Config.QuickWarnReasons,
         dutyAdmins       = _dutyAdmins,
         onDuty           = _dutyAdmins[a and a.citizenid] ~= nil,
+
+        -- Sent on open rather than baked into the JS, so adding one of your own
+        -- landmarks does not mean editing a file that updates overwrite.
+        theme        = Config.Theme,
+        defaultPanel = Config.DefaultPanel or 'dashboard',
+        lists = {
+            landmarks      = Config.Landmarks,
+            pedModels      = Config.PedModels,
+            walkStyles     = Config.WalkStyles,
+            vehicleColours = Config.VehicleColours,
+        },
     }
 end)
 
@@ -368,7 +382,10 @@ lib.callback.register('cipher-admin:server:getRoles', function(src)
     local rows = MySQL.query.await('SELECT * FROM admin_roles ORDER BY id ASC')
     for _, r in ipairs(rows) do
         local ok, perms = pcall(json.decode, r.permissions)
-        r.permissions = ok and perms or {}
+        -- Type-check, not just the pcall: a column holding the JSON literal
+        -- `null` decodes successfully to nil, which drops the key from the
+        -- payload and makes the Permissions panel throw for every role.
+        r.permissions = (ok and type(perms) == 'table') and perms or {}
     end
     return rows
 end)
@@ -618,6 +635,8 @@ lib.callback.register('cipher-admin:server:summonAll', function(src)
     for _, psrc in ipairs(GetPlayers()) do
         local pid = tonumber(psrc)
         if pid ~= src then
+            -- Every one of these is about to make an impossible-looking jump.
+            pcall(function() exports['cipher-admin']:AcExempt(pid) end)
             TriggerClientEvent('cipher-admin:client:teleport', pid, { x = pos.x, y = pos.y, z = pos.z })
         end
     end
@@ -662,6 +681,54 @@ lib.callback.register('cipher-admin:server:getStats', function(src)
         return { error = tostring(result) }
     end
     return result
+end)
+
+-- Flags grow fastest: one speed hack writes a row every sweep. Bans and
+-- warnings are never pruned — small, and still wanted years later.
+local function PruneOldData()
+    local r = Config.Retention
+    if not r or not r.Enabled then return end
+
+    local pruned = {}
+
+    local function prune(table_, days, label)
+        if not days or days <= 0 then return end
+        local n = MySQL.update.await(
+            ('DELETE FROM %s WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)'):format(table_), { days })
+        if n and n > 0 then pruned[#pruned + 1] = ('%d %s'):format(n, label) end
+    end
+
+    prune('admin_audit', r.AuditDays, 'audit rows')
+    prune('admin_flags', r.FlagDays,  'threat flags')
+
+    -- Keyed on last_seen: an account that still connects keeps its links.
+    if r.IdentifierDays and r.IdentifierDays > 0 then
+        local n = MySQL.update.await(
+            'DELETE FROM admin_identifiers WHERE last_seen < DATE_SUB(NOW(), INTERVAL ? DAY)', { r.IdentifierDays })
+        if n and n > 0 then pruned[#pruned + 1] = ('%d identifier records'):format(n) end
+    end
+
+    if #pruned > 0 then
+        print('[Cipher-Admin] Retention sweep removed ' .. table.concat(pruned, ', ') .. '.')
+    end
+end
+
+CreateThread(function()
+    local r = Config.Retention
+    if not r or not r.Enabled then return end
+
+    -- Hourly check against a configured hour. "Every 24h from boot" drifts to
+    -- a different clock time after each restart, which is how a maintenance
+    -- job ends up running at peak.
+    local lastRunDay = nil
+    while true do
+        local now = os.date('*t')
+        if now.hour == (r.RunAtHour or 4) and lastRunDay ~= now.yday then
+            lastRunDay = now.yday
+            pcall(PruneOldData)
+        end
+        Wait(60 * 60 * 1000)
+    end
 end)
 
 -- Expose internals to other server files

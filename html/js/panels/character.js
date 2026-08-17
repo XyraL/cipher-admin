@@ -50,7 +50,7 @@ function renderCharacterPanel() {
 }
 
 async function searchCharacter() {
-    var _inp = document.getElementById('char-search-input');
+    const _inp = document.getElementById('char-search-input');
     const q = _inp ? _inp.value.trim() : '';
     if (!q || q.length < 2) return;
     const res = document.getElementById('char-results');
@@ -131,7 +131,7 @@ async function openCharProfile(citizenid) {
             <div class="profile-section-title">Warnings (${(profile.warnings || []).length})</div>
             ${(profile.warnings || []).length ? profile.warnings.slice(0,3).map(w => `
                 <div class="activity-item">
-                    <div class="activity-icon">⚠️</div>
+                    <div class="activity-icon">${icon('warn')}</div>
                     <div class="activity-body">
                         <div class="activity-action">${w.reason}</div>
                         <div class="activity-detail">by ${w.admin_name} · ${formatDate(w.created_at)}</div>
@@ -144,7 +144,7 @@ async function openCharProfile(citizenid) {
             <div class="profile-section-title">Notes (${profile.notes.length})</div>
             ${profile.notes.length ? profile.notes.slice(0,3).map(n => `
                 <div class="activity-item">
-                    <div class="activity-icon">📝</div>
+                    <div class="activity-icon">${icon('note')}</div>
                     <div class="activity-body">
                         <div class="activity-action">${n.note}</div>
                         <div class="activity-detail">by ${n.admin_name} · ${formatDate(n.created_at)}</div>
@@ -175,7 +175,7 @@ async function openCharProfile(citizenid) {
 
 function openOfflineBanModal(cid, name) {
     closeModal();
-    openModal(`Ban Offline — ${esc(name)}`, `
+    openModal(`Ban Offline — ${name}`, `
         <div class="form-group">
             <label>Reason</label>
             <input class="input" id="offban-reason" placeholder="Enter reason...">
@@ -207,7 +207,7 @@ async function doOfflineBan(cid, name) {
 
 function openDeleteCharModal(cid, name) {
     closeModal();
-    openModal('Delete Character — ' + esc(name),
+    openModal('Delete Character — ' + name,
         '<p style="color:var(--red);font-weight:600">This will permanently delete the character and all associated data from the database. This cannot be undone.</p>'
         + '<div class="profile-row"><span class="profile-row-label">Citizenid</span><span class="profile-row-value" style="font-family:monospace">' + esc(cid) + '</span></div>'
         + '<div class="profile-row"><span class="profile-row-label">Name</span><span class="profile-row-value">' + esc(name) + '</span></div>'
@@ -219,18 +219,18 @@ function openDeleteCharModal(cid, name) {
 caAction('doDeleteChar', (d) => doDeleteChar(d.cid, d.name));
 
 async function doDeleteChar(cid, name) {
-    var inp = document.getElementById('del-confirm');
+    const inp = document.getElementById('del-confirm');
     if (!inp || inp.value.trim() !== cid) {
         inp.style.borderColor = 'var(--red)';
         return;
     }
-    var result = await caFetch('cipher-admin:server:deleteCharacter', { citizenid: cid, name: name });
+    const result = await caFetch('cipher-admin:server:deleteCharacter', { citizenid: cid, name: name });
     closeModal();
     if (result && result.success) {
         openModal('Character Deleted', '<p style="color:var(--green)">' + esc(name) + ' has been permanently removed from the database.</p>',
             '<button class="btn btn-ghost" onclick="closeModal()">OK</button>');
     } else {
-        var reason = (result && result.reason) || 'Unknown error';
+        let reason = (result && result.reason) || 'Unknown error';
         openModal('Delete Failed', '<p style="color:var(--red)">' + esc(reason) + '</p>', '<button class="btn btn-ghost" onclick="closeModal()">OK</button>');
     }
 }

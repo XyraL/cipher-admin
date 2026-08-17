@@ -10,7 +10,7 @@ async function loadSpawner() {
         <div class="section-header mb-12">
             <div>
                 <div class="section-title">Vehicle Spawner</div>
-                <div class="section-sub">${window._spawnTargetName ? '🎯 Spawning for: ' + window._spawnTargetName : 'Spawning for yourself'}</div>
+                <div class="section-sub">${window._spawnTargetName ? 'Spawning for: ' + window._spawnTargetName : 'Spawning for yourself'}</div>
             </div>
             ${window._spawnTargetName ? `<button class="btn btn-ghost btn-sm" onclick="clearSpawnTarget()">✕ Clear Target</button>` : ''}
         </div>
@@ -23,7 +23,7 @@ async function loadSpawner() {
         <div class="spawner-layout">
             <div class="spawner-categories" id="spawner-cats">Loading...</div>
             <div class="spawner-vehicles" id="spawner-veh-wrap">
-                <div class="empty-state"><div class="empty-icon">🚗</div><div class="empty-text">Select a category</div></div>
+                <div class="empty-state"><div class="empty-text">Select a category</div></div>
             </div>
         </div>
     `;
@@ -70,22 +70,16 @@ function renderVehicles(cat) {
     renderVehicleList(_vehicleList[cat] || []);
 }
 
-const VEH_ICONS = {
-    'Sedans': '🚗', 'Sports': '🏎', 'Super': '⚡', 'SUVs': '🚙',
-    'Muscle': '🔥', 'Motorcycles': '🏍', 'Emergency': '🚔',
-    'Vans': '🚐', 'Boats': '⛵', 'Helicopters': '🚁', 'Planes': '✈️',
-};
-
 function renderVehicleList(list) {
     const wrap = document.getElementById('spawner-veh-wrap');
     if (!wrap) return;
     if (!list.length) {
-        wrap.innerHTML = '<div class="empty-state"><div class="empty-icon">🚗</div><div class="empty-text">No vehicles found</div></div>';
+        wrap.innerHTML = emptyState('spawner', 'No vehicles found');
         return;
     }
-    // Renamed off `icon` — core.js now exports a global icon() helper and a
-    // local const of the same name would shadow it inside this function.
-    const vehIcon = VEH_ICONS[_activeCategory] || icon('spawner');
+    // Renamed off `icon` — core.js exports a global icon() and a local const
+    // of the same name would shadow it inside this function.
+    const vehIcon = icon('spawner');
     wrap.innerHTML = `<div class="vehicle-grid">
         ${list.map(v => `
             <div class="vehicle-card" data-ca-action="spawnVehicle" data-model="${escAttr(v)}" data-tip="${escAttr(v)}">

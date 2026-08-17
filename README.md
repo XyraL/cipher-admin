@@ -44,6 +44,11 @@
    ```
    This creates tables for roles, assignments, bans, warnings, audit log, and player notes. The resource will also seed default roles on first start.
 
+   The threat-detection and ban-evasion tables (`admin_flags`,
+   `admin_identifiers`, `admin_ban_identifiers`) are created automatically on
+   start, so **upgrading from 1.1.x needs no SQL import**. Existing bans are
+   backfilled into the new identifier matcher on that same start.
+
 3. **Add to `server.cfg`:**
    ```
    ensure cipher-admin
@@ -86,6 +91,64 @@ Config.AppearanceResource = 'illenium-appearance'
 -- Your server name (shown in Server Stats panel)
 Config.ServerName = 'My FiveM Server'
 
+-- Command names. Rename around a clash, or set to '' to skip registering one
+-- — /r in particular collides with a lot of radio and reply resources.
+Config.Commands = {
+    OpenPanel = 'admin', Report = 'report', ReportShort = 'r',
+    Reply = 'reply', StopSpectate = 'stopspectate',
+}
+Config.DefaultPanel = 'dashboard'   -- panel shown when the menu opens
+
+-- Interface. Applied at runtime — recolour the panel without touching CSS.
+Config.Theme = {
+    Accent    = '#e5484d',
+    Side      = 'right',    -- which edge the drawer slides from
+    Width     = '80vw',
+    MaxWidth  = '1360px',
+    Scanlines = true,
+    Dim       = 0.45,       -- backdrop opacity behind the drawer
+}
+
+-- Notifications: 'ox_lib' | 'qb' | 'custom' | 'chat'
+Config.Notify = { Resource = 'ox_lib', CustomEvent = '', Duration = 5000 }
+
+-- Screenshot resource: 'auto' | 'screenshot-basic' | 'screencapture'
+Config.ScreenshotResource = 'auto'
+
+-- Self Actions tuning — health, armour, sprint and noclip speeds, ammo counts
+Config.SelfTuning = { MaxHealth = 200, ArmourAmount = 100, SprintMultiplier = 2.5, --[[ ... ]] }
+
+-- Editable pick lists used by the Self Actions modals
+Config.Landmarks      = { { name = 'Legion Square', x = 195.0, y = -933.0, z = 30.7 }, --[[ ... ]] }
+Config.SelfWeapons    = { 'WEAPON_PISTOL', --[[ ... ]] }
+Config.PedModels      = { 'mp_m_freemode_01', --[[ ... ]] }
+Config.RandomPeds     = { 'a_m_m_beach_01', --[[ ... ]] }
+Config.WalkStyles     = { 'move_m@casual@a', --[[ ... ]] }
+Config.VehicleColours = { { id = 27, name = 'Red' }, --[[ ... ]] }
+
+-- Automatic cleanup. Bans and warnings are never pruned.
+Config.Retention = { Enabled = true, AuditDays = 90, FlagDays = 30,
+                     IdentifierDays = 0, RunAtHour = 4 }
+
+-- Threat detection. Every detection defaults to 'flag' — see the block in
+-- config.lua for per-detection thresholds, actions and blacklists.
+Config.AntiCheat = {
+    Enabled = true,
+    ExemptAdmins = true,          -- staff have noclip and god mode as job tools
+    ConnectGrace = 90,            -- seconds; spawn selection moves the ped around
+    Webhook = '',                 -- falls back to Config.AuditWebhook
+    Detections = { --[[ health, teleport, speed, explosion, ... ]] },
+}
+
+-- Ban evasion. Which identifier types may DENY a connection; everything is
+-- recorded either way.
+Config.BanEvasion = {
+    Enabled = true,
+    MatchOn = { license = true, discord = true, token = true, ip = false },
+    StoreTokens = true,
+    LinkedAccountAction = 'flag', -- or 'deny'
+}
+
 -- Ban message shown to banned players (%s = reason, %s = expiry)
 Config.BanMessage = 'You have been banned...'
 
@@ -94,6 +157,17 @@ Config.WarningThresholds = {
     { count = 3, action = 'kick',    reason = 'Auto-kick: 3 warnings' },
     { count = 5, action = 'tempban', duration = 86400, reason = 'Auto-ban: 5 warnings' },
 }
+
+-- Durations offered in the ban modal
+Config.BanDurationPresets = { { label = '24 Hours', seconds = 86400 }, ... }
+
+-- One-click reasons in the ban and warn modals — edit to match your rules
+Config.QuickBanReasons  = { 'Cheating / Hacking', 'Repeated RDM', ... }
+Config.QuickWarnReasons = { 'RDM', 'VDM', 'Metagaming', ... }
+
+-- Roles seeded into the database on first start. After that, manage them
+-- from the Permissions panel — editing this table again changes nothing.
+Config.DefaultRoles = { ... }
 ```
 
 ---
@@ -113,9 +187,11 @@ To assign a role to a player, use the Permissions panel or set it directly in th
 ### Player Management
 - Live player list with online time tracker and notes tooltip
 - Kick, warn, temp/permban with reason
+- **Mute** — chat mute with duration presets, survives restarts
 - Freeze / unfreeze
-- Revive, heal, clear wanted level
-- Teleport to player / bring player to you
+- Revive, heal, **set exact health & armour**, **clear wanted level**, **kill**
+- Teleport to player / bring player to you / **send player to a landmark or coordinates**
+- **Eject from vehicle**, optionally deleting it
 - Spectate (first-person follow)
 - Screenshot + **Live Watch** (auto-refreshing screenshots every 2.5s)
 - Private DM to player (in-game overlay)
@@ -123,7 +199,14 @@ To assign a role to a player, use the Permissions panel or set it directly in th
 - Reset position (teleports player to spawn)
 - Give weapon (choose weapon + ammo)
 - Delete nearest vehicle
-- Summon All — teleport all players to your location
+- **View identifiers** — every identifier the player presented, behind its own
+  permission and written to the audit log
+- **Mass actions** — Summon All, Freeze All / Unfreeze All, Revive Nearby.
+  Freeze All skips other staff, so nobody can lock out the people able to undo it
+
+> **Mute scope:** this mutes chat. Voice belongs to whichever voice resource you
+> run and there is no common API across them, so it is opt-in — point
+> `Config.MuteVoiceExport` at your own resource's export to extend it.
 
 ### Character Lookup
 - Search by name or CitizenID (online or offline)
@@ -142,21 +225,117 @@ To assign a role to a player, use the Permissions panel or set it directly in th
 - View all active bans with search
 - Unban players
 - Preset ban durations or custom
+- Bans attach **every** identifier the player has ever presented, not just the
+  one they connected with — see Ban Evasion below
+
+### Threat Detection
+
+A **Threats** panel with a live feed of automated detections, severity, the
+player, what was seen and when, plus one-click spectate / screenshot / ban.
+Flags are pushed to on-duty staff as they happen and posted to Discord.
+
+Detections split into two kinds, and the panel labels which is which:
+
+| | Detection | What it sees |
+|---|---|---|
+| **Server-authoritative** | Health overflow | Health above the engine maximum |
+| | Impossible movement | Distance covered on foot that nothing could cover |
+| | Impossible speed | Sustained velocity past a configurable limit |
+| | Explosion abuse | Blacklisted explosion types and explosion spam — **cancelled**, not just logged |
+| | Weapon damage anomaly | Damage past a cap, or the client setting the override-damage flag at all |
+| | Entity spawn abuse | Blacklisted models and spawn-rate limits — blacklisted spawns are **cancelled** |
+| | Client weapon give | Blacklisted weapons handed out by the client |
+| | Remote task clear | Clearing tasks on someone else's ped (remote freeze / ragdoll) |
+| **Advisory** | Armour overflow | Reported by the client — spoofable, marked as such in the panel |
+| | Client agent silent | The client stopped answering: resource stopped, blocked, or hung |
+
+Server-authoritative checks read state the client does not get to assert —
+either entity properties the server owns under OneSync, or network events the
+server receives regardless. **Health, position and speed detection needs
+OneSync**; with it off those are skipped and the panel says so rather than
+looking quiet. Event-based detection runs either way.
+
+Every detection ships as `action = 'flag'`, meaning "put it in front of a
+human". Set individual detections to `'kick'` or `'ban'` in `config.lua` once
+you know what normal traffic looks like on your own server. Staff are exempt
+by default, and the target of any admin action is exempt briefly afterwards —
+a bring is a 900m position jump on the person being brought.
+
+### Ban Evasion & Alt Detection
+
+Every identifier a player presents — license, license2, discord, steam, xbl,
+live, fivem, IP and **hardware tokens** — is recorded on connect and anchored
+to their license. Issuing a ban attaches all of them.
+
+- **Bans survive an account change.** A ban placed on a Discord account still
+  catches that person on a brand-new license.
+- **Offline bans get the full set too**, pulled from what was recorded the last
+  time that character connected.
+- **Linked accounts** are surfaced in the Threats panel: any account that has
+  ever shared an identifier with a banned one. A clean account linked to a
+  banned one raises a flag by default rather than a denial — households and LAN
+  cafes really do share hardware.
+- **IP is link-only by default.** It is recorded and shown to staff as context
+  but does not deny a connection on its own; turning `MatchOn.ip` on means
+  eventually banning somebody's brother.
+- Denied connections get a proper message with the reason, expiry and ban ID.
+
+Identifier values are **redacted in the UI** — staff see that two accounts
+share a token, not what the token is. Set `Config.BanEvasion.StoreTokens` to
+`false` if you would rather not hold them at all.
+
+Existing bans are backfilled into the new matcher on first start, so upgrading
+does not quietly un-enforce anything.
+
+### Troubleshooting threat detection
+
+**Everyone is being flagged "Client agent silent" right after an upgrade.**
+`client/detection.lua` did not upload. That detection fires when a client stops
+answering, and a client that never had the file never answers — so a partial
+upload flags your entire playerbase at once rather than nobody. Re-upload the
+whole resource folder.
+
+**The Threats panel is empty and the engine says "events only".** OneSync is
+off. Health, position and speed are read from the server's own copy of the ped
+and need it; the event-based detections (explosions, weapon damage, entity
+spawns, weapon gives, task clears) run regardless.
+
+**Staff keep appearing in the feed.** `Config.AntiCheat.ExemptAdmins` is off, or
+the person has no role assigned and so is not recognised as staff. Owners listed
+in `Config.Owners` are always exempt.
+
+**A legitimate script is tripping a detection.** Turn that one detection off
+rather than the engine — every entry in `Config.AntiCheat.Detections` has its
+own `enabled` flag. Military RP servers in particular will want to empty
+`BlacklistedModels` and `BlacklistedExplosions`.
 
 ### Self Actions
 
-50 actions across seven sections, with a live filter box and a favourites bar
+66 actions across eight sections, with a live filter box and a favourites bar
 (right-click any action to pin it).
 
 | Section | Actions |
 |---|---|
-| **Personal** (10) | God Mode, Heal, Revive, Food & Water, Armour Only, Infinite Stamina, Fireproof, No Ragdoll, Clear Wanted, Set Wanted |
+| **Personal** (12) | God Mode, Heal, Revive, Food & Water, Armour Only, Infinite Stamina, Fireproof, No Ragdoll, Clear Wanted, Set Wanted, Freeze Self, Kill Self |
+| **Weapons** (4) | All Weapons, Refill Ammo, Infinite Ammo, Remove Weapons |
 | **Appearance** (6) | Invisible, Ped Model, Random Ped, Revert Ped, Clothing, Walk Style |
-| **Movement** (8) | Noclip, Super Jump, Super Sprint, To Waypoint, To Coords, Save Position, Load Position, Undo Teleport |
-| **Vehicle** (10) | Spawn Vehicle, Repair, Max Mods, Take Keys, Flip Upright, Refuel, Clean, Vehicle God, Set Plate, Delete |
-| **World** (7) | Weather, Time, Freeze Time, Blackout, Announce, Traffic density, Pedestrian density |
+| **Movement** (11) | Noclip, Super Jump, Super Sprint, To Waypoint, To Coords, Save Position, Load Position, Undo Teleport, To Landmark, To Last Death, Into Vehicle |
+| **Vehicle** (13) | Spawn Vehicle, Repair, Max Mods, Take Keys, Flip Upright, Refuel, Clean, Vehicle God, Set Plate, Engine, Colour, Doors, Delete |
+| **World** (8) | Weather, Time, Freeze Time, Blackout, Announce, Traffic, Pedestrians, Time Scale |
 | **Area** (5) | Clear Area, Clear Vehicles, Clear Peds, Clear Objects, Delete Ped |
-| **Utility** (4) | Copy Vector4, Copy Vector3, Entity Info, Spawn Prop |
+| **Utility** (7) | Copy Vector4, Copy Vector3, Entity Info, Spawn Prop, Name Tags, Player Blips, Dev HUD |
+
+**Weapons is gated on the `giveweapon` permission** — the section does not
+render at all for staff without it. Everything else affects only the person
+clicking it.
+
+**Name Tags and Player Blips show players in your scope**, which under OneSync
+is roughly the people near you, not everyone on the server.
+
+**To Landmark** covers 16 common locations (Legion, MRPD, Pillbox, the airport,
+Sandy, Paleto, the prison, Chiliad, Cayo Perico and more); Undo Teleport brings
+you back. **Time Scale** is client-side only — useful for watching a collision
+or a suspected cheat frame by frame without slowing anyone else down.
 
 Weather and time sync with a weathersync resource if one is running (see
 below). "Clothing" and "Revert Ped" require `Config.AppearanceResource` to

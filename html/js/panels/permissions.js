@@ -19,6 +19,12 @@ const ALL_PERMS = [
     { key: 'invisible',   label: 'Invisible' },
     { key: 'godmode',     label: 'God Mode' },
     { key: 'clearwanted', label: 'Clear Wanted' },
+    { key: 'killplayer',  label: 'Kill Player' },
+    { key: 'sethealth',   label: 'Set Health / Armour' },
+    { key: 'eject',       label: 'Eject From Vehicle' },
+    { key: 'mute',        label: 'Mute Players' },
+    { key: 'massactions', label: 'Mass Actions' },
+    { key: 'viewids',     label: 'View Identifiers' },
     { key: 'setjob',      label: 'Set Job' },
     { key: 'setgrade',    label: 'Set Grade' },
     { key: 'setcash',     label: 'Set Cash' },
@@ -37,13 +43,31 @@ const ALL_PERMS = [
     { key: 'viewaudit',   label: 'View Audit Log' },
     { key: 'manageroles', label: 'Manage Roles' },
     { key: 'assignroles', label: 'Assign Roles' },
+
+    // These were declared in config.lua and enforced on the server, but had no
+    // toggle here — so the only way to change them was editing the database by
+    // hand. The list had fallen 13 behind: ten from the 1.1.0 feature batch and
+    // three added with threat detection in 1.2.0.
+    { key: 'screenshot',      label: 'Screenshot Players' },
+    { key: 'slap',            label: 'Slap Players' },
+    { key: 'resetpos',        label: 'Reset Position' },
+    { key: 'dm',              label: 'Direct Message' },
+    { key: 'summonall',       label: 'Summon All Players' },
+    { key: 'giveweapon',      label: 'Give Weapons' },
+    { key: 'viewentities',    label: 'Entity Inspector' },
+    { key: 'reports',         label: 'Handle Reports' },
+    { key: 'restartresource', label: 'Restart Resources' },
+    { key: 'deletechar',      label: 'Delete Characters' },
+    { key: 'viewthreats',     label: 'View Threat Panel' },
+    { key: 'managethreats',   label: 'Resolve Threat Flags' },
+    { key: 'viewlinked',      label: 'View Linked Accounts' },
 ];
 
 async function loadPermissions() {
     const panel = document.getElementById('panel-permissions');
 
     if (!hasPermission('manageroles') && !hasPermission('assignroles')) {
-        panel.innerHTML = '<div class="empty-state"><div class="empty-icon">🔐</div><div class="empty-text">No permission to manage roles</div></div>';
+        panel.innerHTML = emptyState('lock', 'No permission to manage roles');
         return;
     }
 
@@ -97,7 +121,7 @@ function renderRolePermissions() {
                             <div class="perm-row">
                                 <span class="perm-name">${p.label}</span>
                                 <label class="toggle">
-                                    <input type="checkbox" id="perm_${role.name}_${p.key}" ${role.permissions[p.key] ? 'checked' : ''}>
+                                    <input type="checkbox" id="perm_${role.name}_${p.key}" ${(role.permissions || {})[p.key] ? 'checked' : ''}>
                                     <div class="toggle-track"></div>
                                     <div class="toggle-thumb"></div>
                                 </label>
@@ -165,7 +189,7 @@ function renderStaffList() {
                             `).join('')}
                         </tbody>
                     </table>
-                ` : '<div class="empty-state"><div class="empty-icon">🔐</div><div class="empty-text">No staff assigned</div></div>'}
+                ` : emptyState('permissions', 'No staff assigned')}
             </div>
         </div>
     `;

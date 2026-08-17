@@ -21,6 +21,10 @@ AddEventHandler('cipher-admin:server:playerAction', function(data)
     local tName  = tp and (tp.PlayerData.charinfo.firstname .. ' ' .. tp.PlayerData.charinfo.lastname) or data.targetName or '?'
     local tCid   = tp and tp.PlayerData.citizenid or data.targetCid
 
+    -- A bring is a 900m position jump and a revive is health from nothing, so
+    -- the target is exempt briefly or the threat panel fills with staff work.
+    if tSrc then pcall(function() exports['cipher-admin']:AcExempt(tSrc) end) end
+
     -- ── Kick ─────────────────────────────────────────────────────────────────
     if action == 'kick' then
         if not HasPermission(src, 'kick') then return end
@@ -148,13 +152,29 @@ AddEventHandler('cipher-admin:server:playerAction', function(data)
         if not HasPermission(src, 'screenshot') then return end
         if not tSrc then return end
 
+        -- 'auto' takes whichever is started. Naming one matters on servers
+        -- running both, where auto picks by list order.
         local screenshotRes = nil
-        for _, rname in ipairs({ 'screenshot-basic', 'screencapture' }) do
-            if GetResourceState(rname) == 'started' then
-                screenshotRes = rname
-                break
+        local configured    = Config.ScreenshotResource or 'auto'
+
+        if configured ~= 'auto' and configured ~= '' then
+            if GetResourceState(configured) == 'started' then
+                screenshotRes = configured
+            else
+                TriggerClientEvent('ox_lib:notify', src, { title = 'Screenshot',
+                    description = ('Config.ScreenshotResource is "%s" but it is not started.'):format(configured),
+                    type = 'error' })
+                return
+            end
+        else
+            for _, rname in ipairs({ 'screenshot-basic', 'screencapture' }) do
+                if GetResourceState(rname) == 'started' then
+                    screenshotRes = rname
+                    break
+                end
             end
         end
+
         if not screenshotRes then
             TriggerClientEvent('ox_lib:notify', src, { title = 'Screenshot', description = 'No screenshot resource running (screenshot-basic / screencapture).', type = 'error' })
             return
@@ -206,7 +226,121 @@ AddEventHandler('cipher-admin:server:playerAction', function(data)
         local spawnSrc = tSrc or src
         TriggerClientEvent('cipher-admin:client:getSpawnCoords', spawnSrc, data.model, src)
         Audit(src, 'SPAWN_VEHICLE', tName, tCid, data.model)
+
+    -- ── Clear wanted level ────────────────────────────────────────────────────
+    -- The `clearwanted` permission has existed in every default role since
+    -- 1.0.0 and the README has always listed this, but it was only ever
+    -- implemented as a Self Action — there was no way to clear anyone else's.
+    elseif action == 'clearwanted' then
+        if not HasPermission(src, 'clearwanted') then return end
+        if not tSrc then return end
+        TriggerClientEvent('cipher-admin:client:clearWanted', tSrc)
+        Audit(src, 'CLEAR_WANTED', tName, tCid, nil)
+
+    -- ── Kill ──────────────────────────────────────────────────────────────────
+    elseif action == 'kill' then
+        if not HasPermission(src, 'killplayer') then return end
+        if not tSrc then return end
+        TriggerClientEvent('cipher-admin:client:killPlayer', tSrc)
+        Audit(src, 'KILL', tName, tCid, nil)
+
+    -- ── Set health / armour ───────────────────────────────────────────────────
+    -- Heal is all-or-nothing. This is for setting someone to a specific state,
+    -- usually to reproduce a bug report rather than to fix one.
+    elseif action == 'sethealth' then
+        if not HasPermission(src, 'sethealth') then return end
+        if not tSrc then return end
+        local hp  = math.max(0, math.min(200, tonumber(data.health) or 200))
+        local arm = math.max(0, math.min(100, tonumber(data.armour) or 0))
+        TriggerClientEvent('cipher-admin:client:setHealth', tSrc, hp, arm)
+        Audit(src, 'SET_HEALTH', tName, tCid, ('%d hp / %d armour'):format(hp, arm))
+
+    -- ── Eject from vehicle ────────────────────────────────────────────────────
+    elseif action == 'eject' then
+        if not HasPermission(src, 'eject') then return end
+        if not tSrc then return end
+        TriggerClientEvent('cipher-admin:client:eject', tSrc, data.delete == true)
+        Audit(src, 'EJECT', tName, tCid, data.delete and 'and deleted vehicle' or nil)
+
+    -- ── Send player to a position ─────────────────────────────────────────────
+    -- Goto and Bring both move the admin or move the target to the admin. This
+    -- is the third case: put them somewhere neither of you is standing.
+    elseif action == 'sendto' then
+        if not HasPermission(src, 'teleport') then return end
+        if not tSrc then return end
+        local x, y, z = tonumber(data.x), tonumber(data.y), tonumber(data.z)
+        if not x or not y or not z then return end
+        pcall(function() exports['cipher-admin']:AcExempt(tSrc) end)
+        TriggerClientEvent('cipher-admin:client:teleport', tSrc, { x = x, y = y, z = z })
+        Audit(src, 'SEND_TO', tName, tCid, ('%.0f, %.0f, %.0f'):format(x, y, z))
     end
+end)
+
+-- ── Mass actions ──────────────────────────────────────────────────────────────
+-- Deliberately separate from the single-target handler: these iterate every
+-- player, and mixing them in would mean the per-target permission check above
+-- ran once against a target that does not exist.
+lib.callback.register('cipher-admin:server:massAction', function(src, data)
+    if not IsAdmin(src) then return false end
+    if not HasPermission(src, 'massactions') then return false end
+
+    local action = data and data.action
+    local count  = 0
+
+    if action == 'freezeall' then
+        local state = data.state == true
+        for _, psrc in ipairs(GetPlayers()) do
+            local pid = tonumber(psrc)
+            -- Never freeze other staff: an admin who freezes the whole server
+            -- and forgets has just locked out everyone who could unfreeze it.
+            if pid ~= src and not GetAdminCache(pid) then
+                TriggerClientEvent('cipher-admin:client:freeze', pid, state)
+                count = count + 1
+            end
+        end
+        Audit(src, state and 'FREEZE_ALL' or 'UNFREEZE_ALL', nil, nil, ('%d players'):format(count))
+
+    elseif action == 'revivenearby' then
+        local radius = math.max(1.0, tonumber(data.radius) or 50.0)
+        local origin = GetEntityCoords(GetPlayerPed(src))
+        for _, psrc in ipairs(GetPlayers()) do
+            local pid = tonumber(psrc)
+            if pid ~= src then
+                local ok, pos = pcall(function() return GetEntityCoords(GetPlayerPed(pid)) end)
+                if ok and pos and #(pos - origin) <= radius then
+                    TriggerClientEvent('cipher-admin:client:revive', pid)
+                    count = count + 1
+                end
+            end
+        end
+        Audit(src, 'REVIVE_NEARBY', nil, nil, ('%d players within %.0fm'):format(count, radius))
+
+    else
+        return false
+    end
+
+    return { success = true, count = count }
+end)
+
+-- ── Identifiers ───────────────────────────────────────────────────────────────
+-- Behind its own permission: these are the values a ban is built from, and the
+-- IP in particular is personal data that most staff have no reason to see.
+lib.callback.register('cipher-admin:server:getPlayerIdentifiers', function(src, data)
+    if not IsAdmin(src) then return nil end
+    if not HasPermission(src, 'viewids') then return nil end
+
+    local tSrc = tonumber(data and data.targetSrc)
+    if not tSrc then return nil end
+
+    local ids = GetIdentifiers(tSrc) or {}
+    local out = {}
+    for k, v in pairs(ids) do
+        out[#out + 1] = { type = k, value = v }
+    end
+    table.sort(out, function(a, b) return a.type < b.type end)
+
+    Audit(src, 'VIEW_IDENTIFIERS', data.targetName, data.targetCid, nil)
+    return out
 end)
 
 -- ── Bring coord relay ─────────────────────────────────────────────────────────

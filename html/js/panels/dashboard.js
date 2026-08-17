@@ -47,14 +47,14 @@ function loadDashboard(data) {
                 </div>
                 <div class="card-body">
                     <div class="quick-actions">
-                        ${hasPermission('announcement') ? `<button class="quick-btn" onclick="openAnnouncementModal()"><span class="qb-icon">📢</span> Announce</button>` : ''}
-                        ${hasPermission('weather')      ? `<button class="quick-btn" onclick="openWeatherModal()"><span class="qb-icon">🌤</span> Weather</button>` : ''}
-                        ${hasPermission('time')         ? `<button class="quick-btn" onclick="openTimeModal()"><span class="qb-icon">🕐</span> Set Time</button>` : ''}
-                        ${hasPermission('noclip')       ? `<button class="quick-btn" onclick="toggleNoclip()"><span class="qb-icon">🚀</span> Noclip</button>` : ''}
-                        ${hasPermission('invisible')    ? `<button class="quick-btn" onclick="toggleInvisible()"><span class="qb-icon">👻</span> Invisible</button>` : ''}
-                        <button class="quick-btn" onclick="switchPanel('players')"><span class="qb-icon">👥</span> Players</button>
-                        <button class="quick-btn" onclick="switchPanel('spawner')"><span class="qb-icon">🚗</span> Spawner</button>
-                        <button class="quick-btn" onclick="switchPanel('bans')"><span class="qb-icon">⊘</span> Bans</button>
+                        ${hasPermission('announcement') ? `<button class="quick-btn" onclick="openAnnouncementModal()">${icon('adminchat', 'qb-icon')} Announce</button>` : ''}
+                        ${hasPermission('weather')      ? `<button class="quick-btn" onclick="openWeatherModal()">${icon('weather', 'qb-icon')} Weather</button>` : ''}
+                        ${hasPermission('time')         ? `<button class="quick-btn" onclick="openTimeModal()">${icon('clock', 'qb-icon')} Set Time</button>` : ''}
+                        ${hasPermission('noclip')       ? `<button class="quick-btn" onclick="toggleNoclip()">${icon('entities', 'qb-icon')} Noclip</button>` : ''}
+                        ${hasPermission('invisible')    ? `<button class="quick-btn" onclick="toggleInvisible()">${icon('spectate', 'qb-icon')} Invisible</button>` : ''}
+                        <button class="quick-btn" onclick="switchPanel('players')">${icon('players', 'qb-icon')} Players</button>
+                        <button class="quick-btn" onclick="switchPanel('spawner')">${icon('spawner', 'qb-icon')} Spawner</button>
+                        <button class="quick-btn" onclick="switchPanel('bans')">${icon('bans', 'qb-icon')} Bans</button>
                     </div>
                 </div>
             </div>
@@ -65,7 +65,7 @@ function loadDashboard(data) {
                     <button class="btn btn-ghost btn-sm" onclick="switchPanel('audit')">View All</button>
                 </div>
                 <div class="card-body" id="dash-activity">
-                    <div class="empty-state"><div class="empty-icon">≡</div><div class="empty-text">Loading activity...</div></div>
+                    <div class="empty-state"><div class="empty-text">Loading activity...</div></div>
                 </div>
             </div>
         </div>
@@ -77,27 +77,19 @@ function loadDashboard(data) {
 
 async function loadRecentActivity() {
     if (!hasPermission('viewaudit')) {
-        document.getElementById('dash-activity').innerHTML = '<div class="empty-state"><div class="empty-icon">🔒</div><div class="empty-text">No audit access</div></div>';
+        document.getElementById('dash-activity').innerHTML = emptyState('lock', 'No audit access');
         return;
     }
     const rows = await caFetch('cipher-admin:server:getAudit', {});
     const el   = document.getElementById('dash-activity');
     if (!el) return;
     if (!rows || !rows.length) {
-        el.innerHTML = '<div class="empty-state"><div class="empty-icon">≡</div><div class="empty-text">No activity yet</div></div>';
+        el.innerHTML = emptyState('list', 'No activity yet');
         return;
     }
-    const ICONS = {
-        KICK: '👢', PERMBAN: '🔨', TEMPBAN: '⏱', UNBAN: '✅',
-        WARN: '⚠️', FREEZE: '🧊', REVIVE: '💚', HEAL: '💊',
-        GOTO: '📍', BRING: '🔗', SPECTATE: '👁', GIVE_ITEM: '📦',
-        SPAWN_VEHICLE: '🚗', SET_JOB: '💼', ANNOUNCEMENT: '📢',
-        SET_WEATHER: '🌤', SET_TIME: '🕐', ADD_NOTE: '📝',
-        ASSIGN_ROLE: '🔐', REMOVE_ROLE: '🗑',
-    };
     el.innerHTML = rows.slice(0, 12).map(r => `
         <div class="activity-item">
-            <div class="activity-icon">${ICONS[r.action] || '◈'}</div>
+            <div class="activity-icon">${actionIcon(r.action)}</div>
             <div class="activity-body">
                 <div class="activity-action">${r.action.replace(/_/g,' ')}</div>
                 <div class="activity-detail">${r.admin_name}${r.target_name ? ' → ' + r.target_name : ''}${r.details ? ' · ' + r.details : ''}</div>

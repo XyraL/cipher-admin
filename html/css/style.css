@@ -1441,3 +1441,162 @@ html, body {
     border-radius: 3px;
     transition: width 0.3s;
 }
+
+/* ── Threat Detection ──
+   The panel shows two kinds of thing that must not look alike: what the server
+   proved, and what the client claimed. Severity carries the usual semantic
+   colours, and anything advisory is marked in the row itself rather than left
+   to the reader to remember which detections come from where. */
+
+.threat-tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+}
+
+.threat-tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-secondary);
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+}
+.threat-tab:hover  { color: var(--text-primary); }
+.threat-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+/* Status notes. These use the hairline-accent weight deliberately: a config
+   warning is information, not a destructive action, so it never gets a fill. */
+.threat-note {
+    border-left: 2px solid var(--border-light);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    font-size: 11.5px;
+    line-height: 1.5;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 12px;
+}
+.threat-note strong { color: var(--text-primary); }
+.threat-note-red    { border-left-color: var(--red);   background: var(--red-dim); }
+.threat-note-amber  { border-left-color: var(--amber); background: var(--amber-dim); }
+.threat-note-muted  { border-left-color: var(--border-light); }
+
+.threat-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-secondary);
+    font-size: 11px;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* Advisory marker — client-reported, therefore spoofable. */
+.threat-advisory {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+.threat-actions {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+
+.threat-handled { opacity: 0.45; }
+
+/* Flash on a live-pushed row so a flag arriving while the panel is open is
+   noticed rather than silently changing the row order. */
+.threat-new { animation: threat-flash 2.5s ease-out; }
+@keyframes threat-flash {
+    0%   { background: var(--accent-dim); }
+    100% { background: transparent; }
+}
+
+/* ── Linked accounts ── */
+.linked-card {
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    padding: 8px 12px;
+    margin-bottom: 8px;
+}
+.linked-card.linked-banned { border-left-color: var(--red); }
+
+.linked-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.linked-name {
+    color: var(--text-primary);
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 13px;
+}
+.linked-meta {
+    color: var(--text-muted);
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+.modal-section-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.mono { font-family: var(--font-mono); font-size: 11px; }
+
+/* ── Theme options (Config.Theme) ──
+   The accent, drawer width and backdrop dim are applied as inline custom
+   properties at runtime — no rules needed here, because the whole design
+   already reads --accent. These two need real rules because they toggle a
+   pseudo-element and add a mirrored animation. */
+
+#admin-wrapper.no-scanlines::after { display: none; }
+
+@keyframes slideInLeft {
+    from { transform: translateX(-40px); opacity: 0; }
+    to   { transform: translateX(0);     opacity: 1; }
+}
+
+/* ── Icon sizing in the contexts that used to hold emoji ──
+   Emoji sized themselves off font-size; SVGs do not, so each of these slots
+   needs a real dimension or it falls back to the 300x150 replaced-element
+   default and swallows its container. */
+
+.empty-icon .ca-icon    { width: 30px; height: 30px; }
+.inv-item-icon .ca-icon { width: 20px; height: 20px; }
+.profile-avatar .ca-icon{ width: 20px; height: 20px; color: var(--accent); }
+.ca-icon.qb-icon        { width: 16px; height: 16px; }
+.td-icon                { text-align: center; }
+.td-icon .ca-icon       { width: 15px; height: 15px; color: var(--text-secondary); }
+.modal-close .ca-icon   { width: 14px; height: 14px; }
+.self-action-card .sa-desc.pinned { color: var(--amber); font-size: 10px; }

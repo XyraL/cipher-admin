@@ -3,6 +3,7 @@
 # fxmanifest's files{} block, so FiveM never serves it — but it has no place
 # in a release either.
 html/preview.html
+html/.preview-server.js
 
 # Editor / OS noise
 .vscode/

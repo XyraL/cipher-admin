@@ -1,34 +1,35 @@
 -- Cipher-Admin Client — Player Report Commands
+--
+-- Names come from Config.Commands so they can be renamed around a clash or
+-- disabled with ''. /r collides with a lot of radio and reply resources.
 
-RegisterCommand('report', function(_, args)
-    if #args == 0 then
-        lib.notify({ title = 'Report', description = 'Usage: /report [your message]', type = 'error' })
-        return
-    end
-    TriggerServerEvent('cipher-admin:server:submitReport', table.concat(args, ' '), false)
-end, false)
+local function RegisterReportCommand(cfgKey, default, isReply)
+    local c    = Config.Commands
+    local name = (c and c[cfgKey] ~= nil) and c[cfgKey] or default
+    if name == '' then return end
 
-RegisterCommand('r', function(_, args)
-    if #args == 0 then
-        lib.notify({ title = 'Report', description = 'Usage: /r [your message]', type = 'error' })
-        return
-    end
-    TriggerServerEvent('cipher-admin:server:submitReport', table.concat(args, ' '), false)
-end, false)
+    RegisterCommand(name, function(_, args)
+        if #args == 0 then
+            Notify({
+                title       = isReply and 'Reply' or 'Report',
+                description = ('Usage: /%s [your message]'):format(name),
+                type        = 'error',
+            })
+            return
+        end
+        TriggerServerEvent('cipher-admin:server:submitReport', table.concat(args, ' '), isReply)
+    end, false)
+end
 
+RegisterReportCommand('Report',      'report', false)
+RegisterReportCommand('ReportShort', 'r',      false)
 -- /reply — follow-up on your last report after an admin responds
-RegisterCommand('reply', function(_, args)
-    if #args == 0 then
-        lib.notify({ title = 'Reply', description = 'Usage: /reply [your message]', type = 'error' })
-        return
-    end
-    TriggerServerEvent('cipher-admin:server:submitReport', table.concat(args, ' '), true)
-end, false)
+RegisterReportCommand('Reply',       'reply',  true)
 
 -- Show admin response notification
 RegisterNetEvent('cipher-admin:client:reportResponse')
 AddEventHandler('cipher-admin:client:reportResponse', function(data)
-    lib.notify({
+    Notify({
         title       = 'Admin Response — ' .. (data.admin or 'Admin'),
         description = (data.response or '') .. '\n\nUse /reply to respond.',
         type        = 'inform',

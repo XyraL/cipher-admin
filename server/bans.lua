@@ -6,34 +6,16 @@ local GetAdminCache = function(src) return exports['cipher-admin']:GetAdminCache
 local Audit         = function(...) exports['cipher-admin']:Audit(...) end
 local GetIds        = function(src) return exports['cipher-admin']:GetIdentifiers(src) end
 
--- ── Check ban on connect ──────────────────────────────────────────────────────
-AddEventHandler('playerConnecting', function(_, _, deferrals)
-    local src = source
-    deferrals.defer()
-    Wait(0)
+local AttachIds = function(banId, src, license)
+    local ok, n = pcall(function()
+        return exports['cipher-admin']:AttachBanIdentifiers(banId, src, license)
+    end)
+    return ok and n or 0
+end
 
-    local ids = GetIds(src)
-
-    -- Check license, IP, discord
-    local checks = {}
-    if ids.license then checks[#checks+1] = { col = 'license', val = ids.license } end
-    if ids.ip      then checks[#checks+1] = { col = 'ip',      val = ids.ip      } end
-    if ids.discord then checks[#checks+1] = { col = 'discord', val = ids.discord } end
-
-    for _, check in ipairs(checks) do
-        local ban = MySQL.single.await(
-            'SELECT * FROM admin_bans WHERE ' .. check.col .. ' = ? AND is_active = 1 AND (is_permanent = 1 OR expires_at > NOW())',
-            { check.val }
-        )
-        if ban then
-            local expiryStr = ban.is_permanent == 1 and 'Permanent' or tostring(ban.expires_at)
-            deferrals.done(string.format(Config.BanMessage, ban.reason, expiryStr))
-            return
-        end
-    end
-
-    deferrals.done()
-end)
+-- The connect ban check lives in server/identity.lua. It has to be the only
+-- deferral handler on the connection, so it could not be added alongside the
+-- three-column check that used to be here.
 
 -- ── Issue ban ─────────────────────────────────────────────────────────────────
 lib.callback.register('cipher-admin:server:banPlayer', function(src, data)
@@ -70,19 +52,71 @@ lib.callback.register('cipher-admin:server:banPlayer', function(src, data)
         expiresAt = os.date('%Y-%m-%d %H:%M:%S', os.time() + data.duration)
     end
 
-    MySQL.insert.await([[
+    local banId = MySQL.insert.await([[
         INSERT INTO admin_bans (citizenid, player_name, license, ip, discord, reason, admin_name, admin_citizenid, expires_at, is_permanent)
         VALUES (?,?,?,?,?,?,?,?,?,?)
     ]], { tCid, tName, license, ip, discord, data.reason, aName, aCid, expiresAt, isPerm and 1 or 0 })
+
+    -- Every identifier this person has presented, not just the three columns
+    -- above. Offline bans fall back to the license the framework recorded —
+    -- which is why the identifiers table is keyed on license, not citizenid.
+    if not license and tCid then
+        local ok, l = pcall(function() return exports['cipher-admin']:LicenseForCitizenId(tCid) end)
+        if ok then license = l end
+    end
+    local attached = AttachIds(banId, tSrc, license)
 
     if tSrc then
         local msg = string.format(Config.BanMessage, data.reason, isPerm and 'Permanent' or expiresAt)
         DropPlayer(tSrc, msg)
     end
 
-    Audit(src, isPerm and 'PERMBAN' or 'TEMPBAN', tName, tCid, data.reason .. (isPerm and ' [PERM]' or (' [' .. (data.duration/3600) .. 'h]')))
+    Audit(src, isPerm and 'PERMBAN' or 'TEMPBAN', tName, tCid,
+        data.reason
+        .. (isPerm and ' [PERM]' or (' [' .. (data.duration / 3600) .. 'h]'))
+        .. (' [%d identifiers]'):format(attached))
     return true
 end)
+
+-- Used by the threat detector when a detection is set to ban. Same table and
+-- same identifier attachment as a staff ban, so it is exactly as hard to evade
+-- and shows up in the ban manager. durationSeconds of 0 means permanent.
+local function SystemBan(targetSrc, reason, durationSeconds)
+    targetSrc = tonumber(targetSrc)
+    if not targetSrc then return false end
+
+    local isPerm = (durationSeconds or 0) <= 0
+    local expiresAt = nil
+    if not isPerm then
+        expiresAt = os.date('%Y-%m-%d %H:%M:%S', os.time() + durationSeconds)
+    end
+
+    local ids = GetIds(targetSrc) or {}
+    local name = GetPlayerName(targetSrc) or 'Unknown'
+
+    local cid
+    local okP, p = pcall(Framework.GetPlayer, targetSrc)
+    if okP and p and p.PlayerData then
+        cid  = p.PlayerData.citizenid
+        name = p.PlayerData.charinfo.firstname .. ' ' .. p.PlayerData.charinfo.lastname
+    end
+
+    local banId = MySQL.insert.await([[
+        INSERT INTO admin_bans (citizenid, player_name, license, ip, discord, reason, admin_name, admin_citizenid, expires_at, is_permanent)
+        VALUES (?,?,?,?,?,?,?,?,?,?)
+    ]], { cid, name, ids.license, ids.ip, ids.discord, reason, 'Threat Detection', 'system', expiresAt, isPerm and 1 or 0 })
+
+    AttachIds(banId, targetSrc, ids.license)
+
+    MySQL.insert('INSERT INTO admin_audit (action, admin_name, admin_citizenid, target_name, target_citizenid, details) VALUES (?,?,?,?,?,?)', {
+        isPerm and 'AUTO_PERMBAN' or 'AUTO_TEMPBAN', 'Threat Detection', 'system', name, cid, reason,
+    })
+
+    DropPlayer(targetSrc, string.format(Config.BanMessage, reason, isPerm and 'Permanent' or expiresAt))
+    return true
+end
+
+exports('SystemBan', SystemBan)
 
 -- ── Unban ─────────────────────────────────────────────────────────────────────
 lib.callback.register('cipher-admin:server:unban', function(src, data)

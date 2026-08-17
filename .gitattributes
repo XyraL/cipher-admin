@@ -1,0 +1,19 @@
+# FiveM resources are read by a Linux server as often as a Windows one, and a
+# repo that stores CRLF produces a diff full of phantom line changes the first
+# time someone edits it on the other platform. Normalise on commit, check out
+# LF everywhere.
+* text=auto eol=lf
+
+*.lua  text eol=lf
+*.js   text eol=lf
+*.css  text eol=lf
+*.html text eol=lf
+*.sql  text eol=lf
+*.md   text eol=lf
+*.json text eol=lf
+
+*.png binary
+*.jpg binary
+*.ogg binary
+*.ytd binary
+*.ydr binary
