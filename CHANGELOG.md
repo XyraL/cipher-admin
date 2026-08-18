@@ -4,298 +4,65 @@ All notable changes to **Cipher-Admin**.
 
 ## [1.3.0] — 2026-08-17
 
-> **Upgrading:** adds `html/js/panels/items.js` and `html/js/panels/settings.js`.
-> No new directories and no schema changes. Re-upload the whole folder.
->
-> Two config values are worth setting for your server, because the defaults
-> assume Qbox: `Config.AmbulanceResource` (revive) and
-> `Config.VehicleKeysResource` (vehicle keys). If Set Time reverts, see
-> `Config.TimeResource` — the console prints what it tried.
+Two new tabs, and a batch of fixes.
 
-### Added
-- **Settings panel.** Accent colour (eight presets plus a custom hex), which
-  side the drawer opens from, width, backdrop dim, scanline texture, and which
-  panel opens first.
+### New
 
-  Stored per-machine in `localStorage` and layered over the server's
-  `Config.Theme`, so the owner's default remains the default for anyone who has
-  not changed anything. Ban and Delete stay red whatever accent is chosen — a
-  filled red button should always mean something is about to be destroyed.
+**Settings tab** — pick your own accent colour, which side the panel opens from, how wide it is, how dark the background goes, and which tab it opens on. Saved per admin, so your choice doesn't change it for anyone else.
 
-- **Item Spawner panel.** Browses the server's real item list, searchable, give
-  to yourself or to a chosen player with a quantity. Uses the existing
-  `giveItem` callback rather than adding a second route to the same action.
+**Item Spawner tab** — browse your server's own item list, search it, and give anything to yourself or to another player.
 
-- **Vehicle spawner, item list and Give Weapon now read from the framework**
-  instead of lists baked into this resource — typically 900+ vehicles against
-  roughly 200 hardcoded. Categories, brands and readable names come
-  from the framework too, so search matches "Karin" as well as "sultan".
-
-  Give Weapon is a searchable, scrollable list rather than a dropdown, and the
-  Give button stays disabled until something is actually picked.
+**The vehicle spawner, item list and weapon picker now build themselves from your server** instead of a list built into the script. Most servers go from around 200 vehicles to 900 or more, with proper names — so searching a brand finds the car, not just the spawn code.
 
 ### Fixed
-- **Client crash on Take Keys.** `GetEntityModel` crashes on a handle that no
-  longer exists, and `GetClosestVehicle` returns exactly that. Four of five
-  call sites had no existence guard.
-- **Vehicle keys never arrived.** `qbx_vehiclekeys` exposes
-  `GiveKeys(source, vehicle)` as a **server** export with no client equivalent,
-  so the client-side call found nothing at all. Server-side key resources are
-  now called from the server. The native ownership flags apply regardless, so a
-  spawned car is drivable even with no keys resource installed.
-- **Revive did not revive.** The ped stood up while the ambulance script still
-  had the player marked dead. It now goes through whatever owns that state, via
-  `Config.AmbulanceResource`.
-- **Set Time reverted instantly.** Whatever runs the clock reasserts it every
-  tick, and the detection list covered four resources. Now nine, plus
-  `Config.TimeResource` to pin one — and it reports which resource it used, or
-  lists everything it tried.
-- **Noclip was too slow to cross the map.** Speed steps raised and the Shift
-  multiplier doubled to 6×.
-- **The entity spawn rate check produced false positives on staff.** The
-  per-minute spawn cap is removed rather than retuned: `entityCreating` fires for every entity on the server and OneSync
-  assigns the owner by scope rather than by cause, so entities that merely
-  streamed in near a player were counted against them. No threshold fixes that.
-  Blacklisted-model detection stays — a model hash has no such ambiguity.
-- **One noisy detection could fill the flags table.** Live pushes were already
-  deduped to the first hit per type, but every hit still wrote a row. A 30s
-  per-player-per-detection write cooldown now applies to all of them. Counts
-  still increment on every hit, so thresholds and auto-actions are unaffected.
+
+- Spawning a car now gives you the keys
+- Take Keys no longer crashes the game
+- Revive actually revives
+- Setting the time sticks instead of snapping straight back
+- Noclip is much faster with Shift held
+- Threat detection no longer flags your own staff for vehicles and props that load in near them
 
 ### Removed
-- **Set Wanted and Clear Wanted**, from both the self and player action sets.
-  FiveM RP servers disable the NPC police response, so the star system is
-  either inert or fighting the server's own dispatch script.
-- **Give All Weapons.** Written for a scroll-wheel loadout; on a server with an
-  inventory it dumps twenty weapon items into someone's pockets. Refill Ammo,
-  Infinite Ammo and Remove Weapons stay.
 
+- **Set and Clear Wanted** — most RP servers turn the NPC police off, so the star system did nothing
+- **Give All Weapons** — it dumped twenty weapons into your inventory in one click
+
+### Updating
+
+Re-upload the whole folder. No database changes.
+
+Worth checking two settings match what your server runs: `Config.AmbulanceResource` (for revive) and `Config.VehicleKeysResource` (for vehicle keys). If setting the time still snaps back, see `Config.TimeResource` — the server console tells you what it found.
 
 ## [1.2.0] — 2026-08-16
 
-> **Upgrading:** this release adds new files — `server/threats.lua`, `server/mutes.lua` and
-> `server/identity.lua` — plus `client/detection.lua` and
-> `html/js/panels/threats.js`. No new directories this time, but re-upload the
-> whole folder rather than hand-picking changed files. The boot self-check names
-> any of the new server files if it fails to load.
->
-> **If `client/detection.lua` is missed, every player on the server is flagged
-> at once** — that detection fires when a client stops answering, and a client
-> that never had the file never answers. That is the loudest symptom of a
-> partial upload, and it is not a real threat.
->
-> Four tables (`admin_flags`, `admin_identifiers`, `admin_ban_identifiers`,
-> `admin_mutes`) are created automatically on start — **no SQL import needed**.
-> Existing bans are backfilled into the new matcher on that same start.
+The two biggest additions so far: automatic cheat detection, and bans that actually stick.
 
-### Added
-- **Threat detection.** A new Threats panel with a live feed of automated
-  detections, 24-hour summary, severity filtering and one-click
-  spectate / screenshot / ban. Flags push to on-duty staff in-game as they
-  happen and post to Discord.
+### New
 
-  Eight server-authoritative detections read state the client cannot assert —
-  health overflow, impossible movement, impossible speed, explosion abuse,
-  weapon damage anomalies, entity spawn abuse, client weapon gives, and remote
-  task clears. Blacklisted explosions, entity spawns and weapon gives are
-  **cancelled**, not merely logged.
+**Threat detection** — a Threats tab showing suspicious activity as it happens: impossible speed, health hacks, explosion abuse, blacklisted vehicles and more. Blacklisted spawns are blocked outright rather than just logged, and flags reach your on-duty staff in game straight away.
 
-  Two advisory detections come from a client heartbeat and are labelled as such
-  in the panel, because their values can be spoofed: armour overflow, and the
-  client agent going silent. The silence is the reliable half — a client that
-  stops answering has had the resource stopped or blocked.
+Nothing bans anyone on its own. Every check starts as "tell me about it" — you decide which ones get stronger once you've seen what's normal for your server.
 
-  Every detection ships as `action = 'flag'`. Nothing auto-bans until you
-  configure it to.
+**Ban evasion** — bans now cover every identifier someone has, including their hardware. Change your Rockstar account and the ban still finds you. Accounts that share an identifier are shown as linked, so alts are easy to spot.
 
-- **Ban evasion and alt detection.** Every identifier a player presents —
-  including hardware tokens — is recorded on connect and anchored to their
-  license. Bans attach all of them, so a ban placed on a Discord account still
-  catches that person on a new license, and an offline ban gets the full set
-  from what was recorded last time they connected. Accounts that have ever
-  shared an identifier are surfaced as linked, with a redacted identifier list
-  and each linked account's ban status.
+Shared IPs don't ban anyone on their own, because households and phone hotspots share them.
 
-  IP is recorded and shown as a link but does not deny a connection by default:
-  households, hotspots and LAN cafes share one. A clean account linked to a
-  banned one raises a flag rather than a denial, for the same reason.
+**Self actions: 50 → 66**, including a new Weapons section, teleport to landmarks, name tags above players, player blips on the map and a dev HUD.
 
-- Denied connections now get a proper message with the reason, expiry and ban
-  ID, and say which identifier type matched.
-
-- **Self Actions: 50 → 66**, and a new Weapons section.
-
-  | Section | New |
-  |---|---|
-  | Personal | Freeze Self, Kill Self |
-  | **Weapons** (new) | All Weapons, Refill Ammo, Infinite Ammo, Remove Weapons |
-  | Movement | To Landmark (16 locations), To Last Death, Into Vehicle |
-  | Vehicle | Engine, Colour, Doors |
-  | World | Time Scale |
-  | Utility | Name Tags, Player Blips, Dev HUD |
-
-  Name Tags draws names and server IDs above nearby players; Player Blips puts
-  them on the map; Dev HUD shows live coords, heading, speed, FPS and the
-  vehicle you are in. All three are scoped to players the client can see —
-  under OneSync that is roughly the people near you, and the buttons say so.
-
-- **Registry entries can now declare a `perm`**, and a section whose every card
-  is hidden does not render an empty heading. Weapons is gated on the existing
-  `giveweapon` permission: most self actions affect only the person clicking
-  them, but handing yourself an armoury changes what you can do to other
-  players. The weapon list deliberately excludes the launchers and explosives
-  the threat detector blacklists — arming yourself through the admin menu
-  should not flag you through your own anticheat.
-
-- Kill Self turns god mode off first. It would otherwise silently swallow the
-  action, and "the button did nothing" is a worse outcome than the toggle
-  flipping.
-
-- **Configuration options.** Most of what follows was previously a literal
-  somewhere in a file that gets overwritten on every update, which meant
-  customising it was a change you had to remember to reapply.
-
-  | Option | What it does |
-  |---|---|
-  | `Config.Theme` | Accent colour, which edge the drawer opens from, width, scanlines, backdrop dim — applied at runtime, no CSS editing |
-  | `Config.Notify` | ox_lib / QBCore / a custom event / plain chat |
-  | `Config.Commands` | Rename `/admin`, `/report`, `/r`, `/reply`, `/stopspectate`, or set any to `''` to skip registering it |
-  | `Config.DefaultPanel` | Which panel the menu opens on |
-  | `Config.ScreenshotResource` | Pin screenshot-basic or screencapture instead of auto-detecting |
-  | `Config.SelfTuning` | Health, armour, sprint multiplier, noclip speeds, ammo counts |
-  | `Config.Landmarks` | The To Landmark list — add your own server's locations |
-  | `Config.SelfWeapons` | What All Weapons hands out |
-  | `Config.PedModels` / `RandomPeds` / `WalkStyles` / `VehicleColours` | The Self Actions pick lists |
-  | `Config.Retention` | Nightly prune of audit rows, threat flags and identifier records |
-
-  Every list falls back to its previous built-in values, so a server upgrading
-  with an old `config.lua` keeps working rather than rendering empty dropdowns.
-
-- The accent is validated as a literal hex before it is written, and theme
-  widths against a CSS length pattern. These land in inline style properties,
-  so an arbitrary string would be a CSS injection — the same reasoning behind
-  whitelisting role colours rather than escaping them.
-
-- Retention checks hourly and runs on a configured hour rather than every 24h
-  from boot. A boot-relative timer drifts to a different clock time after each
-  restart, which is how a maintenance job ends up running at peak.
-
-- Notifications now route through a single `Notify()` adapter (110 call sites)
-  instead of calling `lib.notify` directly.
-
-- The ped model picker is delegated rather than an inline `onclick`. Its
-  entries come from config now, and interpolating a config value into a JS
-  string literal inside an HTML attribute is exactly the nested-context problem
-  `core.js` exists to avoid — one apostrophe in a model name would have broken
-  the row.
-
-- The keybind's mapping name is deliberately **not** configurable: FiveM stores
-  each player's rebind against it, so renaming it would silently discard
-  everyone's chosen key. `Config.Commands.OpenPanel` adds a chat alias instead.
-
-- **Eight new player actions.** The player-action surface was the thinnest part
-  of the panel; these are the ones staff reach for and had to leave the menu to
-  do:
-
-  | Action | Notes |
-  |---|---|
-  | Clear Wanted | see Fixed — this was documented and permissioned but never implemented for players |
-  | Kill | for testing death and EMS flows |
-  | Set Health / Armour | Heal is all-or-nothing; this sets an exact state |
-  | Eject | remove from a vehicle, optionally deleting it |
-  | Send To | Goto and Bring move *you* or move them *to you*. This is the third case — with the landmark list prefilling the coordinate fields |
-  | Mute | chat mute with duration presets, persisted through restarts |
-  | View Identifiers | behind its own permission and written to the audit log |
-  | Mass actions | Freeze All / Unfreeze All / Revive Nearby |
-
-  Freeze All deliberately skips other staff — an admin who freezes the whole
-  server and forgets has otherwise locked out everyone who could unfreeze it.
-
-  Six new permissions (`killplayer`, `sethealth`, `eject`, `mute`,
-  `massactions`, `viewids`), all toggleable in the Permissions panel.
+**A lot more you can configure** — recolour the panel, rename any command, edit the landmark, vehicle and ped lists, and set how long logs are kept.
 
 ### Fixed
-- **"Clear wanted level" was documented but did not exist.** The `clearwanted`
-  permission has shipped in every default role since 1.0.0 and the README has
-  always listed it under Player Management, but it was only ever implemented as
-  a *Self* action — there was no server branch and no button. The README has
-  been claiming a feature that was never wired. Now implemented.
 
-- **XSS in the reports panel.** Each row serialised the whole report record —
-  including the player-written message — into an inline `onclick` as JSON with
-  only `"` escaped. Reports are now looked up by id from the last-rendered
-  list, the same pattern the ban list already used.
+- Several security fixes around player names and report text being shown in the admin panel
+- 13 permissions existed but had no toggle in the Permissions tab
+- One badly formed role could break the Permissions tab for every role
 
-- **Player names still reached inline handlers in three places.** The Give
-  Weapon and DM modals built `doGiveWeapon(src,'cid','name')` with the name
-  interpolated raw, and the inventory slot did the same with item labels. An
-  apostrophe broke the button; a crafted value did worse. All are delegated
-  now.
+### Updating
 
-- **Pinned Self Actions rendered the word "shield" instead of an icon.**
-  Favourites store an icon *name*, which worked while the set was emoji and
-  broke silently when it moved to SVG. The favourites bar now renders through
-  `icon()` like every other card.
+Re-upload the whole folder — this release adds new files, and missing one causes odd behaviour.
 
-- **Four duplicate escape helpers.** `core.js` was added in 1.1.0 to be the one
-  place output escaping lived, but the local helpers it replaced were never
-  deleted — `escHtml` in adminchat, `_escHtml` in app and reports, `_esc` in
-  inventory, `_escStat` in stats. Three of them were weaker than `esc()`
-  (no `'` escaping). All now call the canonical one.
-
-- **XSS in modal titles.** The v1.1.0 escaping sweep covered modal bodies and
-  removed the inline handlers, but `openModal()` wrote its `title` argument
-  straight into `innerHTML` — and a dozen call sites pass a raw player name
-  into it (`Ban — ${name}`). Same untrusted-data-into-a-staff-session path as
-  the bugs that sweep closed, one argument to the left. Titles are now escaped
-  inside `openModal()` rather than at each call site, so a modal added later is
-  safe without anyone having to remember.
-
-- **13 permissions had no toggle in the Permissions panel.** They were declared
-  in `config.lua` and enforced on the server, but the panel's list had fallen
-  behind — ten from the 1.1.0 feature batch (Screenshot, Slap, Reset Position,
-  DM, Summon All, Give Weapons, Entity Inspector, Handle Reports, Restart
-  Resources, Delete Characters) and three added with threat detection. The only
-  way to change any of them was editing the `admin_roles` table by hand. All 13
-  are now toggleable, and the audit script fails if that list ever falls behind
-  again.
-
-- **A role could take the whole Permissions panel down.** A `permissions`
-  column holding the JSON literal `null` decodes *successfully* to nil, so
-  `ok and perms or {}` yielded nil rather than an empty table — the key was
-  then dropped from the payload entirely and the first lookup threw, killing
-  the render for every role, not just the malformed one. Both the decode and
-  the lookup are now guarded.
-
-### Changed
-- The connect-time ban check moved from `server/bans.lua` to
-  `server/identity.lua`. The old check tested three columns one at a time and
-  was only as durable as whichever of them happened to be populated — usually
-  none, for an offline ban. It also had to move rather than be added alongside:
-  two `playerConnecting` handlers both calling `deferrals.done()` is a race.
-- Automatic bans go through the same path a staff ban does — same table, same
-  identifier attachment — so they appear in the Ban Manager and are exactly as
-  hard to evade as a manual one.
-- `moderator` and `support` now declare `deletechar = false` explicitly. It was
-  already denied by absence; the config is a template people read, so the
-  omission was misleading rather than broken.
-- The boot self-check waits for the resource to finish loading before
-  reporting, so it can check files that load after `server/main.lua`.
-
-- **Codebase cleanup.** No behavioural change intended in any of these:
-  - Removed 189 lines of dead code from `app.js` — ten functions that
-    `self.js`, `adminchat.js` and `reports.js` also defined and which load
-    later, so the `app.js` copies had never run.
-  - `adminchat.js` no longer monkey-patches `switchPanel`. The function every
-    other panel called was a wrapper installed by whichever script happened to
-    load last; it is a plain hook now.
-  - Every emoji is gone from the interface. The audit log and dashboard each
-    carried their own emoji map for the same actions and had drifted nine
-    entries apart; both now read one table in `core.js`.
-  - `var` is gone — the JS is uniformly `const`/`let`.
-  - Line endings normalised to LF, with a `.gitattributes` so they stay that
-    way. Five files were CRLF against the rest of the tree.
-  - Comment density brought down to the codebase's own norm.
+**No SQL import needed.** The new tables create themselves on start, and your existing bans are carried across automatically.
 
 ## [1.1.3] — 2026-07-31
 
