@@ -195,7 +195,6 @@ function renderPlayerProfile(p) {
     const canScreenshot  = hasPermission('screenshot');
     const canGiveWeapon  = hasPermission('giveweapon');
     const canSummonAll   = hasPermission('summonall');
-    const canClearWanted = hasPermission('clearwanted');
     const canKill        = hasPermission('killplayer');
     const canSetHealth   = hasPermission('sethealth');
     const canEject       = hasPermission('eject');
@@ -247,7 +246,6 @@ function renderPlayerProfile(p) {
                     { show: canResetPos,   kind: 'do',   act: 'resetpos',      ico: 'goto',      label: 'Reset Pos' },
                     { show: canDm,         kind: 'open', act: 'dm',            ico: 'adminchat', label: 'DM' },
                     { show: canGiveWeapon, kind: 'open', act: 'giveweapon',    ico: 'shield',    label: 'Give Weapon' },
-                    { show: canClearWanted, kind: 'do',   act: 'clearwanted',  ico: 'check',     label: 'Clear Wanted' },
                     { show: canSetHealth,  kind: 'open', act: 'sethealth',     ico: 'heal',      label: 'Set HP' },
                     { show: canEject,      kind: 'open', act: 'eject',         ico: 'kick',      label: 'Eject' },
                     { show: canSendTo,     kind: 'open', act: 'sendto',        ico: 'goto',      label: 'Send To' },
@@ -511,33 +509,104 @@ async function addNote(cid, name) {
     input.value = '';
 }
 
-const _weapons = [
-    'WEAPON_PISTOL','WEAPON_PISTOL_MK2','WEAPON_COMBATPISTOL','WEAPON_APPISTOL','WEAPON_STUNGUN',
-    'WEAPON_MICROSMG','WEAPON_SMG','WEAPON_SMG_MK2','WEAPON_ASSAULTSMG','WEAPON_COMBATPDW',
-    'WEAPON_ASSAULTRIFLE','WEAPON_ASSAULTRIFLE_MK2','WEAPON_CARBINERIFLE','WEAPON_CARBINERIFLE_MK2',
-    'WEAPON_ADVANCEDRIFLE','WEAPON_SPECIALCARBINE','WEAPON_BULLPUPRIFLE','WEAPON_COMPACTRIFLE',
-    'WEAPON_MG','WEAPON_COMBATMG','WEAPON_COMBATMG_MK2','WEAPON_HEAVYSNIPER','WEAPON_HEAVYSNIPER_MK2',
-    'WEAPON_MARKSMANRIFLE','WEAPON_SNIPERRIFLE','WEAPON_PUMPSHOTGUN','WEAPON_SAWNOFFSHOTGUN',
-    'WEAPON_BULLPUPSHOTGUN','WEAPON_ASSAULTSHOTGUN','WEAPON_HEAVYSHOTGUN','WEAPON_DBSHOTGUN',
-    'WEAPON_RPG','WEAPON_GRENADELAUNCHER','WEAPON_MINIGUN','WEAPON_GRENADE','WEAPON_SMOKEGRENADE',
-    'WEAPON_KNIFE','WEAPON_BAT','WEAPON_HAMMER','WEAPON_CROWBAR','WEAPON_NIGHTSTICK',
-];
+// Weapons come from the server — whatever this server actually installed —
+// rather than a list baked in here, which was wrong on any server that added
+// or removed one. Fetched once per session and reused.
+let _weapons       = [];
+let _weaponSource  = '';
+let _gwSelected    = null;
 
-function openGiveWeaponModal(src, cid, name) {
-    const opts = _weapons.map(function(w) { return '<option value="' + w + '">' + w.replace('WEAPON_','') + '</option>'; }).join('');
-    openModal('Give Weapon — ' + name,
-        '<div class="form-group"><label>Weapon</label><select class="select" id="gw-weapon">' + opts + '</select></div>'
-        + '<div class="form-group"><label>Ammo</label><input class="input" id="gw-ammo" type="number" value="100" min="1" max="9999"></div>',
+async function openGiveWeaponModal(src, cid, name) {
+    openModal(`Give Weapon — ${name}`,
+        '<div class="empty-state"><div class="empty-text">Loading weapons...</div></div>',
+        '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>');
+
+    if (!_weapons.length) {
+        const data = await caFetch('cipher-admin:server:getWeaponList', {});
+        _weapons      = (data && data.weapons) || [];
+        _weaponSource = (data && data.source)  || '';
+    }
+
+    const body = document.querySelector('#ca-modal .modal-body');
+    if (!body) return;
+
+    if (!_weapons.length) {
+        body.innerHTML = '<div class="empty-state"><div class="empty-text">No weapons available</div></div>';
+        return;
+    }
+
+    _gwSelected = null;
+    body.innerHTML =
+        '<div class="form-group"><label>Weapon</label>'
+        + '<input class="input" id="gw-search" placeholder="Search weapons..." autocomplete="off"></div>'
+        + '<div class="picker-list" id="gw-list"></div>'
+        + '<div class="form-group mt-12"><label>Ammo</label>'
+        + '<input class="input" id="gw-ammo" type="number" value="100" min="1" max="9999"></div>'
+        + (_weaponSource === 'built-in'
+            ? '<div style="font-size:11px;color:var(--text-muted);margin-top:6px">'
+              + 'Showing base-game weapons — no weapon list could be read from your framework.</div>'
+            : '');
+
+    _renderWeaponList('');
+
+    const search = document.getElementById('gw-search');
+    if (search) {
+        search.oninput = function () { _renderWeaponList(this.value); };
+        search.focus();
+    }
+
+    // The Give button only appears once something is picked, so it cannot fire
+    // with nothing selected.
+    _updateGiveWeaponFooter(src, cid, name);
+}
+
+function _renderWeaponList(query) {
+    const list = document.getElementById('gw-list');
+    if (!list) return;
+
+    const q = (query || '').trim().toLowerCase();
+    const matches = q
+        ? _weapons.filter(w => w.name.toLowerCase().includes(q) || (w.label || '').toLowerCase().includes(q))
+        : _weapons;
+
+    if (!matches.length) {
+        list.innerHTML = '<div class="picker-empty">No weapon matches that</div>';
+        return;
+    }
+
+    list.innerHTML = matches.slice(0, 200).map(w => `
+        <div class="picker-row ${_gwSelected === w.name ? 'is-selected' : ''}"
+             data-ca-action="gwPick" data-name="${escAttr(w.name)}">
+            <span class="picker-label">${esc(w.label || w.name)}</span>
+            <span class="picker-sub mono">${esc(w.name)}</span>
+        </div>`).join('')
+        + (matches.length > 200
+            ? `<div class="picker-empty">${escNum(matches.length - 200)} more — keep typing to narrow</div>`
+            : '');
+}
+
+caAction('gwPick', (d) => {
+    _gwSelected = d.name;
+    _renderWeaponList((document.getElementById('gw-search') || {}).value || '');
+    const btn = document.getElementById('gw-give');
+    if (btn) btn.removeAttribute('disabled');
+});
+
+function _updateGiveWeaponFooter(src, cid, name) {
+    const footer = document.querySelector('#ca-modal .modal-footer');
+    if (!footer) return;
+    footer.innerHTML =
         '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
-        + '<button class="btn btn-primary" data-ca-action="doGiveWeapon"'
+        + '<button class="btn btn-primary" id="gw-give" disabled data-ca-action="doGiveWeapon"'
         + ' data-src="' + escNum(src) + '" data-cid="' + escAttr(cid) + '"'
-        + ' data-name="' + escAttr(name || '') + '">Give</button>');
+        + ' data-name="' + escAttr(name || '') + '">Give</button>';
 }
 
 caAction('doGiveWeapon', (d) => doGiveWeapon(Number(d.src), d.cid, d.name));
 
 function doGiveWeapon(src, cid, name) {
-    const weapon = (document.getElementById('gw-weapon') || {}).value || 'WEAPON_PISTOL';
+    const weapon = _gwSelected;
+    if (!weapon) return;
     const ammo   = parseInt((document.getElementById('gw-ammo') || {}).value) || 100;
     closeModal();
     playerAction('giveweapon', src, cid, name, { weapon: weapon, ammo: ammo });

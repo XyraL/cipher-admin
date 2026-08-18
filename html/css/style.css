@@ -1600,3 +1600,197 @@ html, body {
 .td-icon .ca-icon       { width: 15px; height: 15px; color: var(--text-secondary); }
 .modal-close .ca-icon   { width: 14px; height: 14px; }
 .self-action-card .sa-desc.pinned { color: var(--amber); font-size: 10px; }
+
+/* ── Searchable picker ──
+   Used by Give Weapon. A scrolling list of clickable rows rather than a
+   <select>: a server's weapon list can run to hundreds of entries, and a
+   native dropdown gives you no search and no room for the spawn name. */
+.picker-list {
+    max-height: 260px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-elevated);
+}
+.picker-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+}
+.picker-row:last-child { border-bottom: 0; }
+.picker-row:hover { background: var(--bg-hover); }
+.picker-row.is-selected {
+    background: var(--accent-dim);
+    box-shadow: inset 2px 0 0 var(--accent);
+}
+.picker-label { font-size: 13px; color: var(--text-primary); }
+.picker-sub   { font-size: 11px; color: var(--text-muted); }
+.picker-empty { padding: 14px 12px; font-size: 12px; color: var(--text-muted); text-align: center; }
+
+/* Spawn name under the readable vehicle name, when they differ. */
+.veh-model { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono), monospace; }
+
+/* ── Settings ── */
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 12px;
+    align-items: start;
+}
+.swatch-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatch {
+    width: 34px; height: 34px;
+    border-radius: var(--radius-sm);
+    border: 2px solid transparent;
+    background: var(--sw);
+    cursor: pointer;
+    padding: 0;
+    transition: transform .12s, border-color .12s, box-shadow .12s;
+}
+.swatch:hover { transform: translateY(-2px); }
+.swatch.is-active {
+    border-color: var(--text-primary);
+    box-shadow: 0 0 0 2px var(--bg-base), 0 0 14px var(--sw);
+}
+.range {
+    width: 100%;
+    accent-color: var(--accent);
+    background: transparent;
+    cursor: pointer;
+}
+
+/* ── Item spawner ── */
+.inv-item-sub { font-size: 9px; color: var(--text-muted); text-align: center; line-height: 1.2; }
+
+/* Confirmation lands on the tile rather than in a dialog — spawning items is
+   repetitive and a modal every time would be in the way. */
+.inv-slot-ok,
+.inv-slot-fail { transition: background .15s, box-shadow .15s; }
+.inv-slot-ok   { background: rgba(48,209,88,.16);  box-shadow: inset 0 0 0 1px var(--green); }
+.inv-slot-fail { background: rgba(229,72,77,.16);  box-shadow: inset 0 0 0 1px var(--red); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DASHBOARD HERO + POLISH
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.dash-hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+    padding: 20px 22px;
+    margin-bottom: 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background:
+        radial-gradient(120% 160% at 0% 0%, var(--accent-dim), transparent 60%),
+        linear-gradient(180deg, var(--bg-elevated), var(--bg-panel));
+    position: relative;
+    overflow: hidden;
+}
+/* A lit edge along the top, brightest where the accent glow sits. */
+.dash-hero::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent 55%);
+}
+.dash-greet {
+    font-family: var(--font-display), inherit;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+}
+.dash-server {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    margin-top: 3px;
+}
+.dash-hero-right { min-width: 220px; }
+.dash-capacity-top {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    font-family: var(--font-mono), monospace;
+}
+.capacity-bar {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--bg-base);
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+.capacity-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #ffffff));
+    box-shadow: 0 0 12px var(--accent-glow);
+    transition: width .5s cubic-bezier(.22,.61,.36,1);
+}
+
+/* Stat tiles that navigate should look like it. */
+.stat-clickable { cursor: pointer; transition: transform .14s, border-color .14s, box-shadow .14s; }
+.stat-clickable:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+    box-shadow: 0 8px 22px -10px var(--accent-glow);
+}
+
+/* ── Panel presence ──
+   The nav marks the active item with a bar; these give the same treatment to
+   the content, so a panel reads as a place rather than a list on a background. */
+.stat-card {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(180deg, var(--bg-elevated), var(--bg-panel));
+}
+.stat-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(90% 120% at 100% 0%, var(--accent-dim), transparent 55%);
+    opacity: .5;
+}
+.stat-card > * { position: relative; z-index: 1; }
+
+.section-title {
+    position: relative;
+    padding-left: 11px;
+}
+.section-title::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 50%;
+    transform: translateY(-50%);
+    width: 3px; height: 15px;
+    border-radius: 2px;
+    background: var(--accent);
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.card-header { border-bottom: 1px solid var(--border); }
+.card-title  { letter-spacing: .01em; }
+
+/* Buttons pick up a little depth on press rather than only on hover. */
+.btn:active { transform: translateY(1px); }
+.btn-primary { box-shadow: 0 0 0 0 var(--accent-glow); transition: box-shadow .18s, transform .12s; }
+.btn-primary:hover { box-shadow: 0 4px 18px -6px var(--accent-glow); }
+
+/* Table rows: a lit leading edge on hover instead of only a background shift. */
+.data-table tbody tr { transition: background .12s, box-shadow .12s; }
+.data-table tbody tr:hover { box-shadow: inset 2px 0 0 var(--accent); }
+
+@media (prefers-reduced-motion: reduce) {
+    .capacity-fill, .stat-clickable, .btn, .btn-primary, .data-table tbody tr { transition: none; }
+}

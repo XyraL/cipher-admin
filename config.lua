@@ -78,6 +78,40 @@ Config.AuditWebhook = ''
 -- 'ox_inventory' | 'qb-inventory' | 'qs-inventory'
 Config.InventoryResource = 'ox_inventory'
 
+-- ── Time / weather resource ───────────────────────────────────────────────────
+-- Whatever runs your clock reasserts it every tick, so setting the time means
+-- telling that resource — not just setting the clock and hoping.
+--
+-- 'auto' tries the known ones in order. If the time snaps back after you set
+-- it, yours is not on that list: put its resource name here, and the console
+-- line printed on a failed Set Time tells you what was tried.
+Config.TimeResource = 'auto'
+
+-- ── Ambulance / death resource ────────────────────────────────────────────────
+-- Revive has to go through whatever owns the death state, or the ped stands up
+-- while the ambulance script still believes the player is dead — which is
+-- exactly what "revive doesn't work" looks like.
+-- 'qbx_medical' | 'qb-ambulancejob' | 'wasabi_ambulance' | 'custom' | 'none'
+Config.AmbulanceResource = 'qbx_medical'
+
+-- Only used when AmbulanceResource is 'custom'. Triggered client-side on the
+-- player being revived, with no arguments.
+Config.CustomReviveEvent = ''
+
+-- ── Vehicle keys resource ─────────────────────────────────────────────────────
+-- Spawning a car does not give you keys unless something is told to hand them
+-- over. Set this to whatever you run.
+-- 'qbx_vehiclekeys' | 'qb-vehiclekeys' | 'qs-vehiclekeys' | 'wasabi_carlock'
+-- | 'mk_vehiclekeys' | 'custom' | 'none'
+Config.VehicleKeysResource = 'qbx_vehiclekeys'
+
+-- Only used when VehicleKeysResource is 'custom'. Triggered server-side with
+-- (source, plate, vehicleNetId).
+Config.CustomGiveKeysEvent = ''
+
+-- Give keys automatically to whoever a vehicle is spawned for.
+Config.GiveKeysOnSpawn = true
+
 -- ── Appearance Resource ───────────────────────────────────────────────────────
 -- Drives the Self Actions "Clothing" and "Revert Ped" buttons. Set this to
 -- whatever you actually run or both buttons do nothing.
@@ -107,7 +141,6 @@ Config.DefaultRoles = {
             noclip       = true,
             invisible    = true,
             godmode      = true,
-            clearwanted  = true,
             -- Character
             setjob       = true,
             setgrade     = true,
@@ -175,7 +208,6 @@ Config.DefaultRoles = {
             noclip       = true,
             invisible    = true,
             godmode      = true,
-            clearwanted  = true,
             setjob       = true,
             setgrade     = true,
             setcash      = false,
@@ -238,7 +270,6 @@ Config.DefaultRoles = {
             noclip       = false,
             invisible    = false,
             godmode      = false,
-            clearwanted  = true,
             setjob       = false,
             setgrade     = false,
             setcash      = false,
@@ -301,7 +332,6 @@ Config.DefaultRoles = {
             noclip       = false,
             invisible    = false,
             godmode      = false,
-            clearwanted  = true,
             setjob       = false,
             setgrade     = false,
             setcash      = false,
@@ -587,11 +617,15 @@ Config.AntiCheat = {
             maxDamage = 250,
         },
 
-        -- SERVER-AUTHORITATIVE. Blacklisted models, and anyone spawning faster
-        -- than a human can click.
+        -- SERVER-AUTHORITATIVE. Blacklisted models only.
+        --
+        -- There was a per-minute spawn cap here too. It was removed rather than
+        -- retuned: entityCreating fires for every entity on the server and
+        -- OneSync assigns the owner by scope, not by cause, so entities that
+        -- merely stream in near a player get counted against them. No threshold
+        -- fixes that. A model hash has no such ambiguity.
         entityspawn = {
-            enabled = true, action = 'flag', threshold = 2,
-            maxPerMinute = 25,
+            enabled = true, action = 'flag', threshold = 1,
             cancelBlacklisted = true,
         },
 

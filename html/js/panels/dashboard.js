@@ -6,27 +6,48 @@ function loadDashboard(data) {
     const perms = CA.admin && CA.admin.permissions || {};
     const isOwnerOrSA = CA.admin && (CA.admin.isOwner || CA.admin.role === 'senioradmin');
 
+    const cap  = data.maxPlayers || 64;
+    const pct  = Math.min(100, Math.round((data.playerCount / cap) * 100));
+    const hour = new Date().getHours();
+    const greet = hour < 5 ? 'Late shift' : hour < 12 ? 'Morning' : hour < 18 ? 'Afternoon' : 'Evening';
+
     panel.innerHTML = `
+        <div class="dash-hero">
+            <div>
+                <div class="dash-greet">${esc(greet)}, ${esc((CA.admin.name || 'Admin').split(' ')[0])}</div>
+                <div class="dash-server">${esc(CA.serverName || 'Server')}</div>
+            </div>
+            <div class="dash-hero-right">
+                <div class="dash-capacity">
+                    <div class="dash-capacity-top">
+                        <span>${escNum(data.playerCount)} / ${escNum(cap)}</span>
+                        <span class="text-muted">${escNum(pct)}%</span>
+                    </div>
+                    <div class="capacity-bar"><div class="capacity-fill" style="width:${escNum(pct)}%"></div></div>
+                </div>
+            </div>
+        </div>
+
         <div class="stat-grid">
-            <div class="stat-card">
+            <div class="stat-card stat-clickable" onclick="switchPanel('players')">
                 <div class="stat-label">Players Online</div>
-                <div class="stat-value green">${data.playerCount}</div>
-                <div class="stat-change">${data.onlineAdmins} admin${data.onlineAdmins !== 1 ? 's' : ''} online</div>
+                <div class="stat-value green">${escNum(data.playerCount)}</div>
+                <div class="stat-change">${escNum(data.onlineAdmins)} admin${data.onlineAdmins !== 1 ? 's' : ''} online</div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card stat-clickable" onclick="switchPanel('threats')">
+                <div class="stat-label">Unresolved Threats</div>
+                <div class="stat-value" id="dash-threat-value">—</div>
+                <div class="stat-change" id="dash-threat-sub">checking...</div>
+            </div>
+            <div class="stat-card stat-clickable" onclick="switchPanel('bans')">
                 <div class="stat-label">Active Bans</div>
-                <div class="stat-value red">${data.activeBans}</div>
-                <div class="stat-change">${data.bansToday} issued today</div>
+                <div class="stat-value red">${escNum(data.activeBans)}</div>
+                <div class="stat-change">${escNum(data.bansToday)} issued today</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">Warnings Today</div>
-                <div class="stat-value amber">${data.warnToday}</div>
-                <div class="stat-change">across all players</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">My Role</div>
-                <div class="stat-value accent" style="font-size:18px;line-height:1.4">${CA.admin.roleLabel || 'Owner'}</div>
-                <div class="stat-change" style="color:${CA.admin.roleColor}">${CA.admin.isOwner ? 'Full Access' : 'Permission-based'}</div>
+            <div class="stat-card stat-clickable" onclick="switchPanel('reports')">
+                <div class="stat-label">Open Reports</div>
+                <div class="stat-value amber" id="dash-report-value">—</div>
+                <div class="stat-change">${escNum(data.warnToday)} warnings today</div>
             </div>
         </div>
 
@@ -73,6 +94,35 @@ function loadDashboard(data) {
 
     loadRecentActivity();
     loadDutyAdmins();
+    loadDashLive();
+}
+
+// The two tiles that need their own round trip. Both fail quiet: a dashboard
+// that renders with a dash in one tile is better than one that does not render.
+async function loadDashLive() {
+    if (hasPermission('viewthreats')) {
+        const t = await caFetch('cipher-admin:server:getThreats', { unhandled: true });
+        const v = document.getElementById('dash-threat-value');
+        const s = document.getElementById('dash-threat-sub');
+        if (v && t) {
+            v.textContent = t.unhandled || 0;
+            v.className = 'stat-value ' + (t.unhandled > 0 ? 'red' : 'green');
+            if (s) s.textContent = `${t.last24 || 0} in the last 24h`;
+        } else if (v) {
+            v.textContent = '0';
+            v.className = 'stat-value green';
+            if (s) s.textContent = 'nothing flagged';
+        }
+    } else {
+        const v = document.getElementById('dash-threat-value');
+        const s = document.getElementById('dash-threat-sub');
+        if (v) v.textContent = '—';
+        if (s) s.textContent = 'no access';
+    }
+
+    const reports = await caFetch('cipher-admin:server:getReports', { status: 'open' });
+    const rv = document.getElementById('dash-report-value');
+    if (rv) rv.textContent = Array.isArray(reports) ? reports.length : 0;
 }
 
 async function loadRecentActivity() {

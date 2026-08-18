@@ -3,7 +3,7 @@ game 'gta5'
 
 name        'Cipher-Admin'
 description 'Advanced Admin Suite for QBox / QBCore'
-version     '1.2.0'
+version     '1.3.0'
 author      'XyraL'
 
 shared_scripts {
@@ -58,6 +58,8 @@ files {
     'html/js/panels/inventory.js',
     'html/js/panels/bans.js',
     'html/js/panels/threats.js',
+    'html/js/panels/items.js',
+    'html/js/panels/settings.js',
     'html/js/panels/permissions.js',
     'html/js/panels/audit.js',
     'html/js/panels/self.js',

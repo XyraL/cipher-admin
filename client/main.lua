@@ -150,6 +150,7 @@ local PROXY_ENDPOINTS = {
     'cipher-admin:server:removeItem',
     'cipher-admin:server:clearInventory',
     'cipher-admin:server:getItemList',
+    'cipher-admin:server:getWeaponList',
     'cipher-admin:server:getVehicleList',
     'cipher-admin:server:deleteCharacter',
     'cipher-admin:server:getResources',
@@ -276,39 +277,95 @@ do
 end
 
 -- ── Noclip shared thread ─────────────────────────────────────────────────────
+-- Speed steps, metres per second. Scroll wheel moves between them.
+local NOCLIP_SPEEDS = { 0.5, 2.0, 6.0, 16.0, 45.0, 110.0, 260.0 }
+local _noclipStep   = 3
+
+-- Noclip, rebuilt to move by POSITION rather than velocity.
+--
+-- The old version set velocity every frame and let the physics engine apply it.
+-- That is what made it feel loose: gravity, buoyancy, ragdoll and collision all
+-- keep acting on a ped that has velocity, so it sank, drifted and snagged on
+-- geometry. Freezing the ped and writing its coordinates directly takes physics
+-- out of the loop entirely, which is how txAdmin's does it.
+--
+-- Movement is scaled by frame time, so it covers the same ground at 30fps and
+-- at 144fps instead of being twice as fast on a better machine.
 local function StartNoclipThread()
     CreateThread(function()
+        local ped = PlayerPedId()
+        FreezeEntityPosition(ped, true)
+        SetEntityCollision(ped, false, false)
+        SetEntityInvincible(ped, true)
+        SetEntityVisible(ped, false, false)
+
         while noclipOn do
             Wait(0)
-            local ped   = PlayerPedId()
-            local speed = IsControlPressed(0, 21) and Tune('NoclipFastSpeed', 12.0) or Tune('NoclipSpeed', 2.5)
+            ped = PlayerPedId()
 
-            -- Use camera rotation so movement matches where you're looking
+            -- Scroll to change speed. Both the cursor-scroll and weapon-wheel
+            -- control ids are checked because which one fires depends on
+            -- whether anything else has the mouse wheel bound.
+            if IsControlJustPressed(0, 241) or IsControlJustPressed(0, 14) then
+                _noclipStep = math.min(#NOCLIP_SPEEDS, _noclipStep + 1)
+                Notify({ title = ('Noclip speed %.1f'):format(NOCLIP_SPEEDS[_noclipStep]), type = 'inform', duration = 900 })
+            elseif IsControlJustPressed(0, 242) or IsControlJustPressed(0, 15) then
+                _noclipStep = math.max(1, _noclipStep - 1)
+                Notify({ title = ('Noclip speed %.1f'):format(NOCLIP_SPEEDS[_noclipStep]), type = 'inform', duration = 900 })
+            end
+
+            local speed = NOCLIP_SPEEDS[_noclipStep]
+            if IsControlPressed(0, 21)  then speed = speed * 6.0 end   -- shift
+            if IsControlPressed(0, 19)  then speed = speed * 0.25 end  -- alt, fine positioning
+
+            local dt = GetFrameTime()
+
             local camRot = GetGameplayCamRot(2)
-            local h      = math.rad(camRot.z)
-            local pit    = math.rad(camRot.x)
-            local cosP   = math.abs(math.cos(pit))
+            local h    = math.rad(camRot.z)
+            local pit  = math.rad(camRot.x)
+            local cosP = math.abs(math.cos(pit))
 
-            local fwdX = -math.sin(h) * cosP
-            local fwdY =  math.cos(h) * cosP
-            local fwdZ =  math.sin(pit)
-            local rgtX =  math.cos(h)
-            local rgtY =  math.sin(h)
+            local fwd = { x = -math.sin(h) * cosP, y = math.cos(h) * cosP, z = math.sin(pit) }
+            local rgt = { x =  math.cos(h),        y = math.sin(h) }
 
-            local vx, vy, vz = 0.0, 0.0, 0.0
-            if IsControlPressed(0, 32) then vx=vx+fwdX*speed; vy=vy+fwdY*speed; vz=vz+fwdZ*speed end
-            if IsControlPressed(0, 33) then vx=vx-fwdX*speed; vy=vy-fwdY*speed; vz=vz-fwdZ*speed end
-            if IsControlPressed(0, 34) then vx=vx-rgtX*speed; vy=vy-rgtY*speed end
-            if IsControlPressed(0, 35) then vx=vx+rgtX*speed; vy=vy+rgtY*speed end
-            if IsControlPressed(0, 22) then vz=vz+speed end
-            if IsControlPressed(0, 36) then vz=vz-speed end
+            local dx, dy, dz = 0.0, 0.0, 0.0
+            if IsControlPressed(0, 32) then dx = dx + fwd.x; dy = dy + fwd.y; dz = dz + fwd.z end
+            if IsControlPressed(0, 33) then dx = dx - fwd.x; dy = dy - fwd.y; dz = dz - fwd.z end
+            if IsControlPressed(0, 34) then dx = dx - rgt.x; dy = dy - rgt.y end
+            if IsControlPressed(0, 35) then dx = dx + rgt.x; dy = dy + rgt.y end
+            if IsControlPressed(0, 22) then dz = dz + 1.0 end
+            if IsControlPressed(0, 36) then dz = dz - 1.0 end
 
-            SetEntityVelocity(ped, vx, vy, vz)
-            SetEntityCollision(ped, false, false)  -- re-apply every frame; game re-enables it otherwise
+            if dx ~= 0.0 or dy ~= 0.0 or dz ~= 0.0 then
+                local pos = GetEntityCoords(ped)
+                SetEntityCoordsNoOffset(ped,
+                    pos.x + dx * speed * dt,
+                    pos.y + dy * speed * dt,
+                    pos.z + dz * speed * dt,
+                    true, true, false)
+            end
+
+            -- Face where the camera looks, so exiting noclip does not spin you.
+            SetEntityHeading(ped, camRot.z)
+
+            -- The game re-enables these, so they are reasserted each frame.
+            SetEntityCollision(ped, false, false)
+            SetEntityVelocity(ped, 0.0, 0.0, 0.0)
+            DisableControlAction(0, 30, true)   -- no strafing input bleeding through
+            DisableControlAction(0, 31, true)
         end
-        local ped = PlayerPedId()
+
+        ped = PlayerPedId()
+        FreezeEntityPosition(ped, false)
         SetEntityCollision(ped, true, true)
+        SetEntityInvincible(ped, false)
+        SetEntityVisible(ped, true, false)
         ResetEntityAlpha(ped)
+
+        -- Drop to the ground rather than leaving the admin hovering.
+        local pos = GetEntityCoords(ped)
+        local found, groundZ = GetGroundZFor_3dCoord(pos.x, pos.y, pos.z, false)
+        if found then SetEntityCoordsNoOffset(ped, pos.x, pos.y, groundZ, true, true, false) end
     end)
 end
 
@@ -364,7 +421,11 @@ end)
 -- ── Time ──────────────────────────────────────────────────────────────────────
 RegisterNetEvent('cipher-admin:client:setTime')
 AddEventHandler('cipher-admin:client:setTime', function(hour, minute)
-    SetClockTime(hour, minute, 0)
+    -- SetClockTime is overwritten by any weathersync resource within a tick,
+    -- which is why this looked like it did nothing while weather worked fine.
+    -- NetworkOverrideClockTime is the one that holds — it is what the Freeze
+    -- Time action already uses successfully.
+    NetworkOverrideClockTime(hour, minute, 0)
     Notify({ title = 'Time', description = string.format('Set to %02d:%02d', hour, minute), type = 'inform' })
 end)
 
@@ -399,20 +460,7 @@ end)
 -- ── Revive / Heal ─────────────────────────────────────────────────────────────
 RegisterNetEvent('cipher-admin:client:revive')
 AddEventHandler('cipher-admin:client:revive', function()
-    local ped = PlayerPedId()
-    ResurrectPed(ped)
-    SetEntityHealth(ped, Tune('MaxHealth', 200))
-    SetPedArmour(ped, Tune('ArmourAmount', 100))
-    ClearPedBloodDamage(ped)
-end)
-
-RegisterNetEvent('cipher-admin:client:clearWanted')
-AddEventHandler('cipher-admin:client:clearWanted', function()
-    local pid = PlayerId()
-    ClearPlayerWantedLevel(pid)
-    SetPlayerWantedLevel(pid, 0, false)
-    SetPlayerWantedLevelNow(pid, false)
-    Notify({ title = 'Wanted level cleared', type = 'inform' })
+    ReviveSelf()
 end)
 
 RegisterNetEvent('cipher-admin:client:killPlayer')
@@ -555,7 +603,96 @@ end
 
 function NearestVehicle(radius)
     local pos = GetEntityCoords(PlayerPedId())
-    return GetClosestVehicle(pos.x, pos.y, pos.z, radius or 25.0, 0, 70)
+    local veh = GetClosestVehicle(pos.x, pos.y, pos.z, radius or 25.0, 0, 70)
+    -- GetClosestVehicle can return a handle for something that no longer
+    -- exists. Passing that to GetEntityModel crashes the client outright, so
+    -- every caller gets a checked handle or nothing.
+    if veh and veh ~= 0 and DoesEntityExist(veh) then return veh end
+    return 0
+end
+
+-- ── Revive ────────────────────────────────────────────────────────────────────
+-- Resurrecting the ped is not the same as being alive. The ambulance resource
+-- owns the death state — its own "dead" flag, the respawn timer, the death
+-- camera — and none of that clears just because the ped stood up. That is why
+-- Revive appeared to do nothing: the body recovered and the script did not.
+function ReviveSelf()
+    local ped = PlayerPedId()
+    local res = Config.AmbulanceResource
+
+    if res == 'qbx_medical' then
+        TriggerEvent('qbx_medical:client:playerRevived')
+    elseif res == 'qb-ambulancejob' then
+        TriggerEvent('hospital:client:Revive')
+    elseif res == 'wasabi_ambulance' then
+        TriggerEvent('wasabi_ambulance:revive')
+    elseif res == 'custom' then
+        if Config.CustomReviveEvent and Config.CustomReviveEvent ~= '' then
+            TriggerEvent(Config.CustomReviveEvent)
+        else
+            print('^3[cipher-admin]^0 Config.AmbulanceResource is "custom" but CustomReviveEvent is empty.')
+        end
+    end
+
+    -- Always restore the ped as well. On 'none' this is the whole revive; with
+    -- an ambulance resource it is belt-and-braces, and harmless either way.
+    if IsEntityDead(ped) then ResurrectPed(ped) end
+    SetEntityHealth(ped, Tune('MaxHealth', 200))
+    SetPedArmour(ped, Tune('ArmourAmount', 100))
+    ClearPedBloodDamage(ped)
+    ClearPedTasksImmediately(ped)
+end
+
+-- ── Vehicle keys ──────────────────────────────────────────────────────────────
+-- Spawning a car gives you a car, not the keys to it. Which resource holds them
+-- differs per server, so this is configured rather than guessed.
+-- Which side a keys resource is driven from differs per resource, and getting
+-- that wrong fails silently-ish: qbx_vehiclekeys exposes GiveKeys(source,
+-- vehicle) as a SERVER export, so calling it on the client finds nothing.
+-- Client-side resources are handled here; server-side ones are asked for over
+-- an event, because only the server knows the source.
+function GiveKeysToVehicle(veh)
+    if not veh or veh == 0 or not DoesEntityExist(veh) then return false end
+
+    local res   = Config.VehicleKeysResource
+    local plate = GetVehicleNumberPlateText(veh)
+
+    -- Native ownership flags first. These are the game's own, work regardless
+    -- of which keys resource is installed, and are what stops a spawned car
+    -- needing to be hotwired.
+    SetVehicleHasBeenOwnedByPlayer(veh, true)
+    SetVehicleNeedsToBeHotwired(veh, false)
+    SetVehicleDoorsLockedForAllPlayers(veh, false)
+    SetVehicleDoorsLocked(veh, 1)
+
+    if res == 'none' or not res or res == '' then return true end
+
+    local netId = NetworkGetNetworkIdFromEntity(veh)
+
+    -- Server-side resources: the server has to make the call.
+    if res == 'qbx_vehiclekeys' or res == 'mk_vehiclekeys' or res == 'custom' then
+        TriggerServerEvent('cipher-admin:server:giveVehicleKeys', netId, plate)
+        return true
+    end
+
+    local ok, err = pcall(function()
+        if res == 'qb-vehiclekeys' then
+            TriggerEvent('vehiclekeys:client:SetOwner', plate)
+        elseif res == 'qs-vehiclekeys' then
+            exports['qs-vehiclekeys']:GiveKeys(plate, GetEntityModel(veh), true)
+        elseif res == 'wasabi_carlock' then
+            exports.wasabi_carlock:GiveKey(plate)
+        else
+            error(('unknown VehicleKeysResource "%s"'):format(tostring(res)))
+        end
+    end)
+
+    if not ok then
+        print(('^3[cipher-admin]^0 keys via "%s" failed: %s'):format(tostring(res), tostring(err)))
+        return false
+    end
+
+    return true
 end
 
 -- ── Overlays: name tags, player blips, dev HUD ───────────────────────────────
@@ -675,7 +812,7 @@ local function StartDevHudThread()
                 ('FPS %d   Health %d   Armour %d'):format(
                     math.floor(1.0 / GetFrameTime()), GetEntityHealth(ped), GetPedArmour(ped)),
             }
-            if veh ~= 0 then
+            if veh ~= 0 and DoesEntityExist(veh) then
                 lines[#lines + 1] = ('Vehicle %s   Plate %s'):format(
                     GetDisplayNameFromVehicleModel(GetEntityModel(veh)):lower(),
                     GetVehicleNumberPlateText(veh))
@@ -816,8 +953,7 @@ RegisterNUICallback('selfAction', function(data, cb)
         Notify({ title = 'Healed', type = 'success' })
 
     elseif action == 'revive' then
-        local ped = PlayerPedId()
-        ResurrectPed(ped); SetEntityHealth(ped, Tune('MaxHealth', 200)); SetPedArmour(ped, Tune('ArmourAmount', 100)); ClearPedBloodDamage(ped)
+        ReviveSelf()
         Notify({ title = 'Revived', type = 'success' })
 
     elseif action == 'foodwater' then
@@ -883,18 +1019,6 @@ RegisterNUICallback('selfAction', function(data, cb)
         _noRagdollOn = not _noRagdollOn
         SetPedCanRagdoll(PlayerPedId(), not _noRagdollOn)
         Notify({ title = 'No Ragdoll', description = _noRagdollOn and 'ON' or 'OFF', type = 'inform' })
-
-    elseif action == 'clearwanted' then
-        ClearPlayerWantedLevel(PlayerId())
-        SetPlayerWantedLevel(PlayerId(), 0, false)
-        SetPlayerWantedLevelNow(PlayerId(), false)
-        Notify({ title = 'Wanted level cleared', type = 'success' })
-
-    elseif action == 'setwanted' then
-        local lvl = math.max(0, math.min(5, tonumber(data.level) or 0))
-        SetPlayerWantedLevel(PlayerId(), lvl, false)
-        SetPlayerWantedLevelNow(PlayerId(), false)
-        Notify({ title = ('Wanted level set to %d'):format(lvl), type = 'inform' })
 
     -- ── Appearance (extended) ──
     elseif action == 'randomped' then
@@ -1184,10 +1308,11 @@ RegisterNUICallback('selfAction', function(data, cb)
             local pos = GetEntityCoords(ped)
             veh = GetClosestVehicle(pos.x, pos.y, pos.z, 25.0, 0, 70)
         end
-        if veh and veh ~= 0 then
+        if veh and veh ~= 0 and DoesEntityExist(veh) then
             local plate = GetVehicleNumberPlateText(veh)
             local model = GetEntityModel(veh)
             TriggerServerEvent('cipher-admin:server:selfSetVehicleOwner', plate, model)
+            GiveKeysToVehicle(veh)
         else
             Notify({ title = 'No vehicle nearby', type = 'error' })
         end
@@ -1293,17 +1418,6 @@ RegisterNUICallback('selfAction', function(data, cb)
         Notify({ title = 'Killed', description = 'Testing the death flow', type = 'inform' })
 
     -- ── Weapons (1.2.0) ──────────────────────────────────────────────────────
-    elseif action == 'giveallweapons' then
-        local ped = PlayerPedId()
-        for _, w in ipairs(SelfWeaponList()) do
-            GiveWeaponToPed(ped, GetHashKey(w), Tune('WeaponAmmo', 250), false, false)
-        end
-        Notify({ title = 'Weapons given', description = ('%d weapons'):format(#SelfWeaponList()), type = 'success' })
-
-    elseif action == 'removeweapons' then
-        RemoveAllPedWeapons(PlayerPedId(), true)
-        Notify({ title = 'Weapons removed', type = 'success' })
-
     elseif action == 'refillammo' then
         local ped = PlayerPedId()
         local n = 0
@@ -1334,6 +1448,10 @@ RegisterNUICallback('selfAction', function(data, cb)
             end)
         end
         Notify({ title = 'Infinite Ammo', description = _infAmmoOn and 'ON' or 'OFF', type = 'inform' })
+
+    elseif action == 'removeweapons' then
+        RemoveAllPedWeapons(PlayerPedId(), true)
+        Notify({ title = 'Weapons removed', type = 'inform' })
 
     -- ── Movement (1.2.0) ─────────────────────────────────────────────────────
     elseif action == 'lastdeath' then
@@ -1459,7 +1577,7 @@ RegisterNUICallback('ca_getEntities', function(data, cb)
         if d <= radius then
             vehs[#vehs+1] = {
                 netId  = NetworkGetNetworkIdFromEntity(v),
-                model  = GetDisplayNameFromVehicleModel(GetEntityModel(v)):lower(),
+                model  = DoesEntityExist(v) and GetDisplayNameFromVehicleModel(GetEntityModel(v)):lower() or '?',
                 plate  = GetVehicleNumberPlateText(v),
                 hp     = math.floor(GetEntityHealth(v) / 2.5),
                 dist   = math.floor(d),
@@ -1474,7 +1592,7 @@ RegisterNUICallback('ca_getEntities', function(data, cb)
         if d <= radius and not IsPedAPlayer(p) then
             peds[#peds+1] = {
                 netId = NetworkGetNetworkIdFromEntity(p),
-                model = tostring(GetEntityModel(p)),
+                model = DoesEntityExist(p) and tostring(GetEntityModel(p)) or '?',
                 hp    = math.floor(GetEntityHealth(p) / 2.5),
                 dist  = math.floor(d),
                 x = math.floor(pp.x), y = math.floor(pp.y), z = math.floor(pp.z),
@@ -1606,5 +1724,16 @@ AddEventHandler('cipher-admin:client:spawnVehicle', function(model, coords)
     SetEntityAsMissionEntity(veh, true, true)
     SetModelAsNoLongerNeeded(hash)
     TaskWarpPedIntoVehicle(PlayerPedId(), veh, -1)
-    Notify({ title = 'Vehicle Spawned', description = model, type = 'success' })
+
+    -- A spawned car with no keys is a car you cannot drive on most servers.
+    local gotKeys = false
+    if Config.GiveKeysOnSpawn ~= false then
+        gotKeys = GiveKeysToVehicle(veh)
+    end
+
+    Notify({
+        title       = 'Vehicle Spawned',
+        description = gotKeys and (model .. ' — keys given') or model,
+        type        = 'success',
+    })
 end)

@@ -2,6 +2,75 @@
 
 All notable changes to **Cipher-Admin**.
 
+## [1.3.0] — 2026-08-17
+
+> **Upgrading:** adds `html/js/panels/items.js` and `html/js/panels/settings.js`.
+> No new directories and no schema changes. Re-upload the whole folder.
+>
+> Two config values are worth setting for your server, because the defaults
+> assume Qbox: `Config.AmbulanceResource` (revive) and
+> `Config.VehicleKeysResource` (vehicle keys). If Set Time reverts, see
+> `Config.TimeResource` — the console prints what it tried.
+
+### Added
+- **Settings panel.** Accent colour (eight presets plus a custom hex), which
+  side the drawer opens from, width, backdrop dim, scanline texture, and which
+  panel opens first.
+
+  Stored per-machine in `localStorage` and layered over the server's
+  `Config.Theme`, so the owner's default remains the default for anyone who has
+  not changed anything. Ban and Delete stay red whatever accent is chosen — a
+  filled red button should always mean something is about to be destroyed.
+
+- **Item Spawner panel.** Browses the server's real item list, searchable, give
+  to yourself or to a chosen player with a quantity. Uses the existing
+  `giveItem` callback rather than adding a second route to the same action.
+
+- **Vehicle spawner, item list and Give Weapon now read from the framework**
+  instead of lists baked into this resource — typically 900+ vehicles against
+  roughly 200 hardcoded. Categories, brands and readable names come
+  from the framework too, so search matches "Karin" as well as "sultan".
+
+  Give Weapon is a searchable, scrollable list rather than a dropdown, and the
+  Give button stays disabled until something is actually picked.
+
+### Fixed
+- **Client crash on Take Keys.** `GetEntityModel` crashes on a handle that no
+  longer exists, and `GetClosestVehicle` returns exactly that. Four of five
+  call sites had no existence guard.
+- **Vehicle keys never arrived.** `qbx_vehiclekeys` exposes
+  `GiveKeys(source, vehicle)` as a **server** export with no client equivalent,
+  so the client-side call found nothing at all. Server-side key resources are
+  now called from the server. The native ownership flags apply regardless, so a
+  spawned car is drivable even with no keys resource installed.
+- **Revive did not revive.** The ped stood up while the ambulance script still
+  had the player marked dead. It now goes through whatever owns that state, via
+  `Config.AmbulanceResource`.
+- **Set Time reverted instantly.** Whatever runs the clock reasserts it every
+  tick, and the detection list covered four resources. Now nine, plus
+  `Config.TimeResource` to pin one — and it reports which resource it used, or
+  lists everything it tried.
+- **Noclip was too slow to cross the map.** Speed steps raised and the Shift
+  multiplier doubled to 6×.
+- **The entity spawn rate check produced false positives on staff.** The
+  per-minute spawn cap is removed rather than retuned: `entityCreating` fires for every entity on the server and OneSync
+  assigns the owner by scope rather than by cause, so entities that merely
+  streamed in near a player were counted against them. No threshold fixes that.
+  Blacklisted-model detection stays — a model hash has no such ambiguity.
+- **One noisy detection could fill the flags table.** Live pushes were already
+  deduped to the first hit per type, but every hit still wrote a row. A 30s
+  per-player-per-detection write cooldown now applies to all of them. Counts
+  still increment on every hit, so thresholds and auto-actions are unaffected.
+
+### Removed
+- **Set Wanted and Clear Wanted**, from both the self and player action sets.
+  FiveM RP servers disable the NPC police response, so the star system is
+  either inert or fighting the server's own dispatch script.
+- **Give All Weapons.** Written for a scroll-wheel loadout; on a server with an
+  inventory it dumps twenty weapon items into someone's pockets. Refill Ammo,
+  Infinite Ammo and Remove Weapons stay.
+
+
 ## [1.2.0] — 2026-08-16
 
 > **Upgrading:** this release adds new files — `server/threats.lua`, `server/mutes.lua` and

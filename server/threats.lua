@@ -29,6 +29,19 @@ local AC = Config.AntiCheat or { Enabled = false, Detections = {} }
 -- their way into an automatic ban.
 local COUNT_WINDOW = 600
 
+-- Minimum gap between DB rows for the same player and the same detection.
+--
+-- Live pushes and webhooks were already deduped to the first hit of each type,
+-- but every single hit still wrote a row. A misbehaving detection could
+-- therefore fill the table without anyone seeing more than one notification —
+-- which is exactly what happened: one over-eager check wrote several hundred
+-- rows in an afternoon while showing a single toast.
+--
+-- The count still increments on every hit, so thresholds and auto-actions are
+-- unaffected. Only the row-writing is throttled.
+local WRITE_COOLDOWN = 30
+local _lastWrite = {}   -- src -> { [detection] = os.time() }
+
 local _counts    = {}   -- src -> { [detection] = { n, first, last } }
 local _exempt    = {}   -- src -> os.time() until which they are not checked
 local _connected = {}   -- src -> os.time() of connect, for the grace period
@@ -218,9 +231,19 @@ local function Flag(src, det, detail, meta)
         created_at  = os.date('%Y-%m-%d %H:%M:%S'),
     }
 
-    MySQL.insert('INSERT INTO admin_flags (citizenid, license, player_name, detection, severity, detail, meta) VALUES (?,?,?,?,?,?,?)', {
-        cid, license, name, det, payload.severity, detail, meta and json.encode(meta) or nil,
-    })
+    -- Throttled per player per detection. The rolling count above already
+    -- incremented, so thresholds and auto-actions still see every hit — this
+    -- only stops one noisy check from filling the table.
+    local writeKey = src or 0
+    _lastWrite[writeKey] = _lastWrite[writeKey] or {}
+    local lastAt = _lastWrite[writeKey][det]
+
+    if not lastAt or (now - lastAt) >= WRITE_COOLDOWN then
+        _lastWrite[writeKey][det] = now
+        MySQL.insert('INSERT INTO admin_flags (citizenid, license, player_name, detection, severity, detail, meta) VALUES (?,?,?,?,?,?,?)', {
+            cid, license, name, det, payload.severity, detail, meta and json.encode(meta) or nil,
+        })
+    end
 
     table.insert(_recent, 1, payload)
     if #_recent > RECENT_MAX then table.remove(_recent) end
@@ -392,29 +415,43 @@ AddEventHandler('weaponDamageEvent', function(sender, data)
 end)
 
 -- ── SERVER-AUTHORITATIVE: entity creation ────────────────────────────────────
--- Fires before the entity exists network-wide, so cancelling means it is never
--- spawned. Server-created entities have no owner and are skipped.
-
+-- Fires before the entity exists network-wide, so cancelling means a
+-- blacklisted model is never spawned rather than deleted a moment later.
+--
+-- ONLY the model is checked here, and that is deliberate.
+--
+-- There used to be a "more than N entities a minute" rate check as well. It
+-- had to go: entityCreating fires for EVERY entity created on the server, and
+-- under OneSync the owner is whichever client the entity is in scope of — not
+-- whoever caused it. So props, peds and vehicles that any script streams in
+-- near a player get attributed to that player, and standing in a busy part of
+-- the map is enough to trip it continuously. It flagged the test server's own
+-- admin several hundred times in four hours.
+--
+-- A model hash does not have that problem: a rhino appearing is a rhino
+-- appearing, whoever happens to own it. Precise signal stays, guesswork goes.
 AddEventHandler('entityCreating', function(entity)
     local cfg = DetCfg('entityspawn')
     if not cfg then return end
 
-    local okOwner, owner = pcall(NetworkGetEntityOwner, entity)
-    if not okOwner or not owner or owner <= 0 then return end
-
-    local src = owner
-    if IsExempt(src) then return end
-
     local okModel, model = pcall(GetEntityModel, entity)
-    if okModel and model and _blModels[model] then
-        if cfg.cancelBlacklisted ~= false then CancelEvent() end
-        Flag(src, 'entityspawn', ('Blacklisted model: %s'):format(_blModels[model]))
-        return
+    if not okModel or not model or not _blModels[model] then return end
+
+    if cfg.cancelBlacklisted ~= false then CancelEvent() end
+
+    -- Ownership is only consulted once we already know this is a blacklisted
+    -- model, and only to name someone. An unresolvable owner still cancels the
+    -- spawn; it just gets logged without a name attached.
+    local src
+    local okOwner, owner = pcall(NetworkGetEntityOwner, entity)
+    if okOwner and owner and owner > 0 and GetPlayerName(owner) then
+        src = owner
     end
 
-    if RateExceeded(src, 'entityspawn', cfg.maxPerMinute) then
-        Flag(src, 'entityspawn', ('More than %d entities spawned in a minute'):format(cfg.maxPerMinute or 25))
-    end
+    if src and IsExempt(src) then return end
+
+    Flag(src, 'entityspawn', ('Blacklisted model: %s'):format(_blModels[model]),
+        src and nil or { playerName = 'Unattributed' })
 end)
 
 -- ── SERVER-AUTHORITATIVE: client weapon gives ────────────────────────────────
@@ -526,6 +563,7 @@ AddEventHandler('playerDropped', function()
     local src = source
     _counts[src], _exempt[src], _connected[src] = nil, nil, nil
     _lastPos[src], _rate[src], _heartbeat[src], _flagged[src] = nil, nil, nil, nil
+    _lastWrite[src] = nil
 end)
 
 -- Refreshed on a timer, not per flag: building the admin cache walks every

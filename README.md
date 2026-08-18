@@ -112,6 +112,21 @@ Config.Theme = {
 -- Notifications: 'ox_lib' | 'qb' | 'custom' | 'chat'
 Config.Notify = { Resource = 'ox_lib', CustomEvent = '', Duration = 5000 }
 
+-- Time resource. Whatever runs your clock reasserts it every tick, so Set Time
+-- has to tell it. 'auto' tries the known ones; the console prints what it used.
+Config.TimeResource = 'auto'
+
+-- Revive has to go through whatever owns the death state, or the ped stands up
+-- while the ambulance script still thinks the player is dead.
+-- 'qbx_medical' | 'qb-ambulancejob' | 'wasabi_ambulance' | 'custom' | 'none'
+Config.AmbulanceResource = 'qbx_medical'
+
+-- Spawning a car gives no keys unless something is told to hand them over.
+-- 'qbx_vehiclekeys' | 'qb-vehiclekeys' | 'qs-vehiclekeys' | 'wasabi_carlock'
+-- | 'mk_vehiclekeys' | 'custom' | 'none'
+Config.VehicleKeysResource = 'qbx_vehiclekeys'
+Config.GiveKeysOnSpawn     = true
+
 -- Screenshot resource: 'auto' | 'screenshot-basic' | 'screencapture'
 Config.ScreenshotResource = 'auto'
 
@@ -189,7 +204,7 @@ To assign a role to a player, use the Permissions panel or set it directly in th
 - Kick, warn, temp/permban with reason
 - **Mute** — chat mute with duration presets, survives restarts
 - Freeze / unfreeze
-- Revive, heal, **set exact health & armour**, **clear wanted level**, **kill**
+- Revive, heal, **set exact health & armour**, **kill**
 - Teleport to player / bring player to you / **send player to a landmark or coordinates**
 - **Eject from vehicle**, optionally deleting it
 - Spectate (first-person follow)
@@ -207,6 +222,37 @@ To assign a role to a player, use the Permissions panel or set it directly in th
 > **Mute scope:** this mutes chat. Voice belongs to whichever voice resource you
 > run and there is no common API across them, so it is opt-in — point
 > `Config.MuteVoiceExport` at your own resource's export to extend it.
+
+### Settings
+
+Per-admin interface preferences, stored on your machine rather than the server
+— so one person's choice is not everyone's.
+
+- Accent colour: eight presets plus a custom hex
+- Which side the drawer opens from, its width, and the backdrop dim
+- Scanline texture on or off
+- Which panel opens first
+
+Layered over the server's `Config.Theme`, so the owner's default stays the
+default for anyone who has not changed anything. Ban and Delete stay red
+whatever accent you pick — a filled red button always means something is about
+to be destroyed.
+
+### Item Spawner
+
+Browses your server's **real item list**, not a list baked into this resource.
+
+- Search by item name or label
+- Give to yourself or to any online player
+- Set a quantity
+
+### Vehicle Spawner
+
+Reads your framework's own vehicle list — typically 900+ vehicles against
+roughly 200 when it was hardcoded. Categories, brands and readable
+names come from the framework too, so searching Karin and sultan both find
+the same car. Falls back to a built-in list if the framework list cannot be
+read, and says which it used at boot.
 
 ### Character Lookup
 - Search by name or CitizenID (online or offline)
@@ -311,13 +357,13 @@ own `enabled` flag. Military RP servers in particular will want to empty
 
 ### Self Actions
 
-66 actions across eight sections, with a live filter box and a favourites bar
+63 actions across eight sections, with a live filter box and a favourites bar
 (right-click any action to pin it).
 
 | Section | Actions |
 |---|---|
-| **Personal** (12) | God Mode, Heal, Revive, Food & Water, Armour Only, Infinite Stamina, Fireproof, No Ragdoll, Clear Wanted, Set Wanted, Freeze Self, Kill Self |
-| **Weapons** (4) | All Weapons, Refill Ammo, Infinite Ammo, Remove Weapons |
+| **Personal** (10) | God Mode, Heal, Revive, Food & Water, Armour Only, Infinite Stamina, Fireproof, No Ragdoll, Freeze Self, Kill Self |
+| **Weapons** (3) | Refill Ammo, Infinite Ammo, Remove Weapons |
 | **Appearance** (6) | Invisible, Ped Model, Random Ped, Revert Ped, Clothing, Walk Style |
 | **Movement** (11) | Noclip, Super Jump, Super Sprint, To Waypoint, To Coords, Save Position, Load Position, Undo Teleport, To Landmark, To Last Death, Into Vehicle |
 | **Vehicle** (13) | Spawn Vehicle, Repair, Max Mods, Take Keys, Flip Upright, Refuel, Clean, Vehicle God, Set Plate, Engine, Colour, Doors, Delete |

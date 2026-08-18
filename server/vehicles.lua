@@ -97,9 +97,104 @@ local VEHICLES = {
     },
 }
 
+-- The framework's own vehicle list, grouped into the categories the spawner
+-- renders. Cached because building it walks every vehicle on the server and
+-- the answer only changes on restart.
+local _cache = nil
+
+local function BuildVehicleList()
+    if _cache then return _cache end
+
+    local ok, vehicles = pcall(function() return Framework.GetVehicles() end)
+    if not ok or not vehicles then
+        -- No framework list — fall back to the built-in models, normalised into
+        -- the same { model, label } shape so the panel never sees two formats.
+        local fallback, n = {}, 0
+        for cat, models in pairs(VEHICLES) do
+            fallback[cat] = {}
+            for _, m in ipairs(models) do
+                fallback[cat][#fallback[cat] + 1] = { model = m, label = m }
+                n = n + 1
+            end
+        end
+        _cache = { list = fallback, source = 'built-in', count = n }
+        return _cache
+    end
+
+    -- Group by category, and carry the label so the card can show "Sultan RS"
+    -- rather than "sultan2".
+    local grouped, count = {}, 0
+    for spawn, v in pairs(vehicles) do
+        local cat = v.category or 'Uncategorised'
+        -- Categories arrive lowercase from both frameworks; the panel headings
+        -- read better capitalised.
+        cat = cat:sub(1, 1):upper() .. cat:sub(2)
+        grouped[cat] = grouped[cat] or {}
+        grouped[cat][#grouped[cat] + 1] = {
+            model = spawn,
+            label = v.brand and (v.brand .. ' ' .. (v.label or spawn)) or (v.label or spawn),
+        }
+        count = count + 1
+    end
+
+    for _, models in pairs(grouped) do
+        table.sort(models, function(a, b) return a.label < b.label end)
+    end
+
+    _cache = { list = grouped, source = 'framework', count = count }
+    return _cache
+end
+
+-- Keys for resources whose API lives on the server. qbx_vehiclekeys exposes
+-- GiveKeys(source, vehicle) here and nowhere on the client, which is why
+-- calling it client-side reported "could not give keys".
+RegisterNetEvent('cipher-admin:server:giveVehicleKeys')
+AddEventHandler('cipher-admin:server:giveVehicleKeys', function(netId, plate)
+    local src = source
+    if not IsAdmin(src) then return end
+
+    local veh = NetworkGetEntityFromNetworkId(netId)
+    if not veh or veh == 0 or not DoesEntityExist(veh) then return end
+
+    local res = Config.VehicleKeysResource
+
+    local ok, err = pcall(function()
+        if res == 'qbx_vehiclekeys' then
+            exports.qbx_vehiclekeys:GiveKeys(src, veh, true)
+        elseif res == 'mk_vehiclekeys' then
+            TriggerEvent('mk_vehiclekeys:server:addKey', src, plate)
+        elseif res == 'custom' then
+            if Config.CustomGiveKeysEvent and Config.CustomGiveKeysEvent ~= '' then
+                TriggerEvent(Config.CustomGiveKeysEvent, src, plate, netId)
+            else
+                error('CustomGiveKeysEvent is empty')
+            end
+        end
+    end)
+
+    if not ok then
+        print(('^3[cipher-admin]^0 keys via "%s" failed: %s'):format(tostring(res), tostring(err)))
+    end
+end)
+
 lib.callback.register('cipher-admin:server:getVehicleList', function(src)
     if not IsAdmin(src) then return nil end
-    return VEHICLES
+    local built = BuildVehicleList()
+    return { categories = built.list, source = built.source, count = built.count }
+end)
+
+AddEventHandler('onResourceStart', function(res)
+    if res ~= GetCurrentResourceName() then return end
+    CreateThread(function()
+        -- The framework has to be up before its vehicle table can be read.
+        Wait(3000)
+        local built = BuildVehicleList()
+        if built.source == 'framework' then
+            print(('[Cipher-Admin] Vehicle spawner: %d vehicles from the framework.'):format(built.count))
+        else
+            print('[Cipher-Admin] Vehicle spawner: framework list unavailable, using the built-in models.')
+        end
+    end)
 end)
 
 -- Spawn relay: admin requests spawn → target client spawns

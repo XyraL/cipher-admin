@@ -60,8 +60,13 @@ function onOpen(data) {
     CA.onDuty           = data.onDuty           || false;
     CA.dutyAdmins       = data.dutyAdmins       || {};
     CA.lists            = data.lists            || {};
+    CA.serverTheme      = data.theme            || {};
 
-    applyTheme(data.theme);
+    // Server theme first, then this admin's own overrides on top. Settings are
+    // per-machine, so an owner's Config.Theme stays the default for everyone
+    // who has not changed anything.
+    if (typeof caApplyEffectiveTheme === 'function') caApplyEffectiveTheme();
+    else applyTheme(data.theme);
 
     document.getElementById('admin-overlay').classList.remove('hidden');
     document.getElementById('sidebar-server-name').textContent = data.serverName;
@@ -73,7 +78,9 @@ function onOpen(data) {
     // loadDashboard populates the header counters, so it runs even when
     // DefaultPanel is something else.
     loadDashboard(data);
-    switchPanel(data.defaultPanel || 'dashboard');
+
+    const mine = typeof caLoadSettings === 'function' ? caLoadSettings() : {};
+    switchPanel(mine.defaultPanel || data.defaultPanel || 'dashboard');
 }
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
@@ -206,6 +213,8 @@ function switchPanel(name) {
         inventory:   'Inventory Viewer',
         bans:        'Ban Manager',
         threats:     'Threat Detection',
+        items:       'Item Spawner',
+        settings:    'Settings',
         permissions: 'Permissions',
         audit:       'Audit Log',
         reports:     'Player Reports',
@@ -229,6 +238,8 @@ function switchPanel(name) {
     if (name === 'permissions') loadPermissions();
     if (name === 'audit')       loadAudit();
     if (name === 'inventory')   renderInventoryPanel();
+    if (name === 'items')       { if (typeof renderItemsPanel    === 'function') renderItemsPanel(); }
+    if (name === 'settings')    { if (typeof renderSettingsPanel === 'function') renderSettingsPanel(); }
     if (name === 'character')   renderCharacterPanel();
     if (name === 'reports') {
         _reportUnread = 0;

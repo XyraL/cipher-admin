@@ -227,16 +227,6 @@ AddEventHandler('cipher-admin:server:playerAction', function(data)
         TriggerClientEvent('cipher-admin:client:getSpawnCoords', spawnSrc, data.model, src)
         Audit(src, 'SPAWN_VEHICLE', tName, tCid, data.model)
 
-    -- ── Clear wanted level ────────────────────────────────────────────────────
-    -- The `clearwanted` permission has existed in every default role since
-    -- 1.0.0 and the README has always listed this, but it was only ever
-    -- implemented as a Self Action — there was no way to clear anyone else's.
-    elseif action == 'clearwanted' then
-        if not HasPermission(src, 'clearwanted') then return end
-        if not tSrc then return end
-        TriggerClientEvent('cipher-admin:client:clearWanted', tSrc)
-        Audit(src, 'CLEAR_WANTED', tName, tCid, nil)
-
     -- ── Kill ──────────────────────────────────────────────────────────────────
     elseif action == 'kill' then
         if not HasPermission(src, 'killplayer') then return end

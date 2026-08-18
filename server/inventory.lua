@@ -244,15 +244,71 @@ lib.callback.register('cipher-admin:server:clearInventory', function(src, data)
 end)
 
 -- ── Get item list (for give item search) ──────────────────────────────────────
+-- Both lists come from the framework rather than a table in this resource: a
+-- server's items and weapons are whatever it actually installed, and a
+-- hardcoded list is wrong on every server that added one.
+local _itemCache, _weaponCache
+
 lib.callback.register('cipher-admin:server:getItemList', function(src)
     if not IsAdmin(src) then return nil end
-    if Config.InventoryResource == 'ox_inventory' then
-        local items = exports.ox_inventory:Items()
-        local list  = {}
-        for name, item in pairs(items) do
-            list[#list+1] = { name = name, label = item.label or name, weight = item.weight }
-        end
-        return list
+    if _itemCache then return _itemCache end
+
+    local ok, items = pcall(function() return Framework.GetItems() end)
+    if not ok or not items then return {} end
+
+    local list = {}
+    for name, item in pairs(items) do
+        list[#list + 1] = { name = name, label = item.label or name, weight = item.weight }
     end
-    return {}
+    table.sort(list, function(a, b) return a.label < b.label end)
+
+    _itemCache = list
+    return list
+end)
+
+-- Weapons for the Give Weapon picker. On an ox_inventory server these are just
+-- the items prefixed weapon_; on QBCore they come off Shared.Weapons.
+lib.callback.register('cipher-admin:server:getWeaponList', function(src)
+    if not IsAdmin(src) then return nil end
+    if not HasPermission(src, 'giveweapon') then return nil end
+    if _weaponCache then return _weaponCache end
+
+    local ok, weapons = pcall(function() return Framework.GetWeapons() end)
+
+    local list = {}
+    if ok and weapons then
+        for name, w in pairs(weapons) do
+            list[#list + 1] = { name = name, label = w.label or name }
+        end
+    end
+
+    -- Nothing resolvable — fall back to the base-game weapons so the picker is
+    -- usable rather than empty. Flagged so the panel can say where it came from.
+    local source = 'framework'
+    if #list == 0 then
+        source = 'built-in'
+        for _, w in ipairs({
+            'weapon_pistol', 'weapon_combatpistol', 'weapon_appistol', 'weapon_pistol50',
+            'weapon_snspistol', 'weapon_heavypistol', 'weapon_vintagepistol',
+            'weapon_microsmg', 'weapon_smg', 'weapon_assaultsmg', 'weapon_combatpdw',
+            'weapon_machinepistol', 'weapon_minismg',
+            'weapon_assaultrifle', 'weapon_carbinerifle', 'weapon_advancedrifle',
+            'weapon_specialcarbine', 'weapon_bullpuprifle', 'weapon_compactrifle',
+            'weapon_pumpshotgun', 'weapon_sawnoffshotgun', 'weapon_assaultshotgun',
+            'weapon_bullpupshotgun', 'weapon_heavyshotgun',
+            'weapon_sniperrifle', 'weapon_heavysniper', 'weapon_marksmanrifle',
+            'weapon_mg', 'weapon_combatmg', 'weapon_gusenberg',
+            'weapon_knife', 'weapon_bat', 'weapon_crowbar', 'weapon_hammer',
+            'weapon_golfclub', 'weapon_nightstick', 'weapon_machete', 'weapon_flashlight',
+            'weapon_stungun', 'weapon_fireextinguisher',
+        }) do
+            -- "weapon_combatpistol" -> "Combat Pistol"
+            local label = w:gsub('^weapon_', ''):gsub('^%l', string.upper)
+            list[#list + 1] = { name = w, label = label }
+        end
+    end
+
+    table.sort(list, function(a, b) return a.label < b.label end)
+    _weaponCache = { weapons = list, source = source }
+    return _weaponCache
 end)

@@ -18,7 +18,6 @@ const ALL_PERMS = [
     { key: 'noclip',      label: 'Noclip' },
     { key: 'invisible',   label: 'Invisible' },
     { key: 'godmode',     label: 'God Mode' },
-    { key: 'clearwanted', label: 'Clear Wanted' },
     { key: 'killplayer',  label: 'Kill Player' },
     { key: 'sethealth',   label: 'Set Health / Armour' },
     { key: 'eject',       label: 'Eject From Vehicle' },

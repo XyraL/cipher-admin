@@ -23,14 +23,11 @@ const SELF_ACTIONS = [
     { sec: 'Personal', key: 'infstamina',  label: 'Infinite Stamina', desc: 'Never run out of breath', ico: 'self', toggle: true },
     { sec: 'Personal', key: 'fireproof',   label: 'Fireproof',     desc: 'Immune to fire damage',      ico: 'shield', toggle: true },
     { sec: 'Personal', key: 'noragdoll',   label: 'No Ragdoll',    desc: 'Stay on your feet',          ico: 'self', toggle: true },
-    { sec: 'Personal', key: 'clearwanted', label: 'Clear Wanted',  desc: 'Drop wanted level to zero',  ico: 'check' },
-    { sec: 'Personal', key: 'setwanted',   label: 'Set Wanted',    desc: 'Choose a star level',        ico: 'warn', ui: true },
     { sec: 'Personal', key: 'freezeself',  label: 'Freeze Self',   desc: 'Lock yourself in place',     ico: 'freeze', toggle: true },
     { sec: 'Personal', key: 'killself',    label: 'Kill Self',     desc: 'Test the death & EMS flow',  ico: 'warn', danger: true },
 
     // Gated on `giveweapon` — the one self action that changes what you can do
     // to other players.
-    { sec: 'Weapons', key: 'giveallweapons', label: 'All Weapons',     desc: 'Give yourself every weapon', ico: 'weapon', perm: 'giveweapon' },
     { sec: 'Weapons', key: 'refillammo',     label: 'Refill Ammo',     desc: 'Top up everything you carry', ico: 'weapon', perm: 'giveweapon' },
     { sec: 'Weapons', key: 'infammo',        label: 'Infinite Ammo',   desc: 'Never reload',               ico: 'weapon', perm: 'giveweapon', toggle: true },
     { sec: 'Weapons', key: 'removeweapons',  label: 'Remove Weapons',  desc: 'Strip your loadout',         ico: 'trash', perm: 'giveweapon', danger: true },
@@ -195,7 +192,6 @@ function selfBtn(key) {
     if (key === 'spawner')    { switchPanel('spawner'); return; }
     if (key === 'copyvec')    { selfCopyVector('copyvector'); return; }
     if (key === 'copyvec3')   { selfCopyVector('copyvector3'); return; }
-    if (key === 'setwanted')  { selfWantedModal(); return; }
     if (key === 'walkstyle')  { selfWalkModal(); return; }
     if (key === 'tpcoords')   { selfCoordsModal(); return; }
     if (key === 'setplate')   { selfPlateModal(); return; }
@@ -234,21 +230,6 @@ function _selfSend(action, extra) {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
     });
 }
-
-function selfWantedModal() {
-    const opts = [0,1,2,3,4,5].map(function (n) {
-        return '<option value="' + n + '">' + (n === 0 ? 'Clear (0 stars)' : n + ' star' + (n > 1 ? 's' : '')) + '</option>';
-    }).join('');
-    openModal('Set Wanted Level',
-        '<div class="form-group"><label>Stars</label><select class="select" id="wanted-sel">' + opts + '</select></div>',
-        '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
-        + '<button class="btn btn-primary" data-ca-action="applyWanted">Apply</button>');
-}
-caAction('applyWanted', function () {
-    const v = parseInt((document.getElementById('wanted-sel') || {}).value) || 0;
-    closeModal();
-    _selfSend('setwanted', { level: v });
-});
 
 function selfWalkModal() {
     const styles = _selfList('walkStyles',

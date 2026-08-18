@@ -195,6 +195,61 @@ local function Audit(adminSrc, action, targetName, targetCid, details)
     end
 end
 
+-- ── Time / weather sync ───────────────────────────────────────────────────────
+-- Every one of these owns the clock and will reassert it on its next tick, so
+-- setting the time means telling the right one rather than setting it and
+-- hoping. Config.TimeResource skips detection when your clock is run by
+-- something not listed.
+TIME_RESOURCES_CHECKED = {
+    'qbx_weathersync', 'qb-weathersync', 'renewed-weathersync', 'Renewed-Weathersync',
+    'rcore_weathersync', 'cd_easytime', 'vSync', 'av_weather', 'wk_wars2x_time',
+}
+
+local function TrySyncOn(res, h, m)
+    if GetResourceState(res) ~= 'started' then return false end
+
+    local ok = pcall(function()
+        if res == 'qbx_weathersync' then
+            exports.qbx_weathersync:setTime(h, m)
+        elseif res == 'qb-weathersync' then
+            TriggerEvent('qb-weathersync:server:changeTime', h, m, 0, false)
+        elseif res == 'renewed-weathersync' or res == 'Renewed-Weathersync' then
+            TriggerEvent('renewed-weathersync:server:setTime', h, m, false)
+        elseif res == 'rcore_weathersync' then
+            exports['rcore_weathersync']:SetTime(h, m, 0)
+        elseif res == 'cd_easytime' then
+            exports['cd_easytime']:SetTime(h, m)
+        elseif res == 'vSync' then
+            TriggerEvent('vSync:requestSync')
+            exports['vSync']:setTime(h, m)
+        elseif res == 'av_weather' then
+            exports['av_weather']:setTime(h, m)
+        else
+            error('no handler for ' .. res)
+        end
+    end)
+
+    if ok then
+        print(('[Cipher-Admin] Time set via %s.'):format(res))
+        return true
+    end
+
+    print(('^3[cipher-admin]^0 %s is running but its time API did not accept the call.'):format(res))
+    return false
+end
+
+function SyncTime(h, m)
+    local pinned = Config.TimeResource
+    if pinned and pinned ~= '' and pinned ~= 'auto' then
+        return TrySyncOn(pinned, h, m)
+    end
+
+    for _, res in ipairs(TIME_RESOURCES_CHECKED) do
+        if TrySyncOn(res, h, m) then return true end
+    end
+    return false
+end
+
 -- ── Init ──────────────────────────────────────────────────────────────────────
 local _serverStartTime = os.time()
 
@@ -579,21 +634,23 @@ lib.callback.register('cipher-admin:server:setTime', function(src, data)
     local h = data.hour
     local m = data.minute
 
-    -- Try to update whichever weathersync resource is running so it doesn't
-    -- immediately revert the time. Check resource state before triggering so we
-    -- don't rely on pcall+TriggerEvent which never throws even with no handler.
-    if GetResourceState('qb-weathersync') == 'started' then
-        TriggerEvent('qb-weathersync:server:changeTime', h, m, 0, false)
-    elseif GetResourceState('renewed-weathersync') == 'started' then
-        TriggerEvent('renewed-weathersync:server:setTime', h, m, false)
-    elseif GetResourceState('rcore_weathersync') == 'started' then
-        pcall(function() exports['rcore_weathersync']:SetTime(h, m, 0) end)
-    elseif GetResourceState('cd_easytime') == 'started' then
-        pcall(function() exports['cd_easytime']:SetTime(h, m) end)
+    -- Whatever owns the clock has to be told, or it reasserts the real time on
+    -- its next tick and the change looks like it never happened. Setting the
+    -- clock client-side alone loses that race every time.
+    local handled = SyncTime(h, m)
+
+    if not handled then
+        -- Nothing recognised owns the clock. Either nothing does — in which
+        -- case the client broadcast below is the whole change and will stick —
+        -- or something does and is not in the list, in which case it will fight
+        -- back and this line is the clue that says so.
+        print(('^3[cipher-admin]^0 Set Time: no known time resource detected. If the time '
+            .. 'reverts, set Config.TimeResource to whatever runs your clock '
+            .. '(checked: %s).'):format(table.concat(TIME_RESOURCES_CHECKED, ', ')))
     end
 
-    -- Always broadcast to clients — if no weathersync is running this is the
-    -- only change; if one IS running the export above already updated it.
+    -- Always broadcast to clients — if nothing owns the clock this is the only
+    -- change; if something does, the call above already updated it.
     TriggerClientEvent('cipher-admin:client:setTime', -1, h, m)
 
     Audit(src, 'SET_TIME', nil, nil, h .. ':' .. string.format('%02d', m))

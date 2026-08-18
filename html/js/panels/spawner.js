@@ -3,6 +3,7 @@
 let _vehicleList     = {};
 let _activeCategory  = null;
 let _spawnerSearch   = '';
+let _vehicleSource   = '';
 
 async function loadSpawner() {
     const panel = document.getElementById('panel-spawner');
@@ -30,7 +31,9 @@ async function loadSpawner() {
 
     if (Object.keys(_vehicleList).length === 0) {
         const data = await caFetch('cipher-admin:server:getVehicleList', {});
-        _vehicleList = data || {};
+        // The server groups and labels; the panel renders what it is given.
+        _vehicleList   = (data && data.categories) || {};
+        _vehicleSource = (data && data.source) || '';
     }
     renderCategories();
     if (_activeCategory) renderVehicles(_activeCategory);
@@ -59,8 +62,12 @@ function selectCategory(cat) {
 function filterSpawner(q) {
     _spawnerSearch = q.toLowerCase();
     if (_spawnerSearch) {
+        // Search hits the readable label as well as the spawn name, so "sultan"
+        // and "Karin" both find the same car.
         const all = Object.values(_vehicleList).flat();
-        renderVehicleList(all.filter(v => v.toLowerCase().includes(_spawnerSearch)));
+        renderVehicleList(all.filter(v =>
+            v.model.toLowerCase().includes(_spawnerSearch) ||
+            (v.label || '').toLowerCase().includes(_spawnerSearch)));
     } else if (_activeCategory) {
         renderVehicles(_activeCategory);
     }
@@ -82,9 +89,10 @@ function renderVehicleList(list) {
     const vehIcon = icon('spawner');
     wrap.innerHTML = `<div class="vehicle-grid">
         ${list.map(v => `
-            <div class="vehicle-card" data-ca-action="spawnVehicle" data-model="${escAttr(v)}" data-tip="${escAttr(v)}">
+            <div class="vehicle-card" data-ca-action="spawnVehicle" data-model="${escAttr(v.model)}" data-tip="${escAttr(v.model)}">
                 <div class="veh-icon">${vehIcon}</div>
-                <div class="veh-name">${esc(v)}</div>
+                <div class="veh-name">${esc(v.label || v.model)}</div>
+                ${v.label && v.label !== v.model ? `<div class="veh-model">${esc(v.model)}</div>` : ''}
             </div>
         `).join('')}
     </div>`;
