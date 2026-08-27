@@ -93,7 +93,7 @@ function renderAuditTable(rows) {
                     <tr>
                         <td class="td-icon">${actionIcon(r.action)}</td>
                         <td class="td-action">${r.action.replace(/_/g,' ')}</td>
-                        <td style="color:var(--accent);font-weight:600">${r.admin_name}</td>
+                        <td style="color:var(--accent);font-weight:600">${esc(r.admin_name)}</td>
                         <td class="text-muted">${r.target_name || '—'}</td>
                         <td class="text-muted truncate" style="max-width:200px">${r.details || '—'}</td>
                         <td class="text-muted text-sm" title="${r.created_at}">${timeAgo(r.created_at)}</td>

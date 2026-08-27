@@ -118,9 +118,9 @@ function renderRolePermissions() {
                     <div class="perm-list">
                         ${ALL_PERMS.map(p => `
                             <div class="perm-row">
-                                <span class="perm-name">${p.label}</span>
+                                <span class="perm-name">${esc(p.label)}</span>
                                 <label class="toggle">
-                                    <input type="checkbox" id="perm_${role.name}_${p.key}" ${(role.permissions || {})[p.key] ? 'checked' : ''}>
+                                    <input type="checkbox" id="perm_${esc(role.name)}_${p.key}" ${(role.permissions || {})[p.key] ? 'checked' : ''}>
                                     <div class="toggle-track"></div>
                                     <div class="toggle-thumb"></div>
                                 </label>

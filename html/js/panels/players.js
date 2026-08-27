@@ -274,8 +274,8 @@ function renderPlayerProfile(p) {
             <div class="profile-row"><span class="profile-row-label">DOB</span><span class="profile-row-value">${ci.birthdate || 'N/A'}</span></div>
             <div class="profile-row"><span class="profile-row-label">Phone</span><span class="profile-row-value">${ci.phone || 'N/A'}</span></div>
             <div class="profile-row"><span class="profile-row-label">Gender</span><span class="profile-row-value">${ci.gender === 0 ? 'Male' : 'Female'}</span></div>
-            <div class="profile-row"><span class="profile-row-label">Job</span><span class="profile-row-value">${job.label || job.name || 'N/A'}</span></div>
-            <div class="profile-row"><span class="profile-row-label">Grade</span><span class="profile-row-value">${job.grade && job.grade.name || 'N/A'}</span></div>
+            <div class="profile-row"><span class="profile-row-label">Job</span><span class="profile-row-value">${esc(job.label || job.name || 'N/A')}</span></div>
+            <div class="profile-row"><span class="profile-row-label">Grade</span><span class="profile-row-value">${esc(job.grade && job.grade.name || 'N/A')}</span></div>
         </div>
 
         <!-- Money -->
@@ -417,7 +417,7 @@ function openBanModal(src, cid, name) {
         <div class="form-group">
             <label>Duration</label>
             <select class="select" id="ban-duration">
-                ${(CA.banPresets || []).map(p => `<option value="${p.seconds}">${p.label}</option>`).join('')}
+                ${(CA.banPresets || []).map(p => `<option value="${p.seconds}">${esc(p.label)}</option>`).join('')}
             </select>
         </div>
         <div class="form-group">

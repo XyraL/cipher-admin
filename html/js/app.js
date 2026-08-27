@@ -147,7 +147,7 @@ function closeAdmin() {
 function renderAdminBadge(admin) {
     const el = document.getElementById('sidebar-admin-badge');
     el.innerHTML = `
-        <div class="badge-name">${admin.name || 'Admin'}</div>
+        <div class="badge-name">${esc(admin.name || 'Admin')}</div>
         <span class="badge-role" style="background:${admin.roleColor}22;color:${admin.roleColor}">${admin.roleLabel || admin.role}</span>
         <button class="btn btn-xs mt-4" id="duty-btn" onclick="toggleAdminDuty()" style="width:100%;margin-top:6px"></button>
     `;

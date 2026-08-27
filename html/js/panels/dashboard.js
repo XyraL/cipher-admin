@@ -142,7 +142,7 @@ async function loadRecentActivity() {
             <div class="activity-icon">${actionIcon(r.action)}</div>
             <div class="activity-body">
                 <div class="activity-action">${r.action.replace(/_/g,' ')}</div>
-                <div class="activity-detail">${r.admin_name}${r.target_name ? ' → ' + r.target_name : ''}${r.details ? ' · ' + r.details : ''}</div>
+                <div class="activity-detail">${esc(r.admin_name)}${r.target_name ? ' → ' + r.target_name : ''}${r.details ? ' · ' + r.details : ''}</div>
             </div>
             <div class="activity-time">${timeAgo(r.created_at)}</div>
         </div>
@@ -166,7 +166,7 @@ async function loadDutyAdmins() {
         const dur  = mins < 60 ? mins + 'm' : Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm';
         return `<div class="flex items-center gap-8" style="padding:4px 0;border-bottom:1px solid var(--border)">
             <span class="status-dot online"></span>
-            <span style="flex:1;font-size:13px">${a.name}</span>
+            <span style="flex:1;font-size:13px">${esc(a.name)}</span>
             <span class="badge badge-muted" style="background:${a.roleColor}22;color:${a.roleColor}">${a.roleLabel}</span>
             <span class="text-muted text-sm">${dur}</span>
         </div>`;

@@ -119,8 +119,8 @@ async function openCharProfile(citizenid) {
         </div>
         <div class="profile-section">
             <div class="profile-section-title">Job</div>
-            <div class="profile-row"><span class="profile-row-label">Job</span><span class="profile-row-value">${job.label || job.name || 'N/A'}</span></div>
-            <div class="profile-row"><span class="profile-row-label">Grade</span><span class="profile-row-value">${job.grade?.name || 'N/A'} (${job.grade?.level ?? 'N/A'})</span></div>
+            <div class="profile-row"><span class="profile-row-label">Job</span><span class="profile-row-value">${esc(job.label || job.name || 'N/A')}</span></div>
+            <div class="profile-row"><span class="profile-row-label">Grade</span><span class="profile-row-value">${esc(job.grade?.name || 'N/A')} (${job.grade?.level ?? 'N/A'})</span></div>
         </div>
         <div class="profile-section">
             <div class="profile-section-title">Economy</div>
@@ -133,8 +133,8 @@ async function openCharProfile(citizenid) {
                 <div class="activity-item">
                     <div class="activity-icon">${icon('warn')}</div>
                     <div class="activity-body">
-                        <div class="activity-action">${w.reason}</div>
-                        <div class="activity-detail">by ${w.admin_name} · ${formatDate(w.created_at)}</div>
+                        <div class="activity-action">${esc(w.reason)}</div>
+                        <div class="activity-detail">by ${esc(w.admin_name)} · ${formatDate(w.created_at)}</div>
                     </div>
                 </div>
             `).join('') : '<div class="text-muted text-sm">No warnings</div>'}
@@ -147,7 +147,7 @@ async function openCharProfile(citizenid) {
                     <div class="activity-icon">${icon('note')}</div>
                     <div class="activity-body">
                         <div class="activity-action">${n.note}</div>
-                        <div class="activity-detail">by ${n.admin_name} · ${formatDate(n.created_at)}</div>
+                        <div class="activity-detail">by ${esc(n.admin_name)} · ${formatDate(n.created_at)}</div>
                     </div>
                 </div>
             `).join('') : '<div class="text-muted text-sm">No notes</div>'}

@@ -104,7 +104,7 @@ function viewBan(id) {
 
     const expires = b.is_permanent ? 'Permanent' : (b.expires_at ? formatDate(b.expires_at) : 'N/A');
 
-    openModal(`Ban Details — ${b.player_name}`, `
+    openModal(`Ban Details — ${esc(b.player_name)}`, `
         <div class="profile-row"><span class="profile-row-label">Player</span><span class="profile-row-value">${esc(b.player_name)}</span></div>
         <div class="profile-row"><span class="profile-row-label">Citizenid</span><span class="profile-row-value">${esc(b.citizenid || 'N/A')}</span></div>
         <div class="profile-row"><span class="profile-row-label">Reason</span><span class="profile-row-value">${esc(b.reason)}</span></div>
