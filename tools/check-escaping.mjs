@@ -22,6 +22,18 @@ const FREE_TEXT = [
   'item', 'itemName', 'vehicle', 'model', 'job', 'gang',
 ].join('|');
 
+// Checked by hand and genuinely safe.
+//
+// It lives here rather than as a comment on the line, because every one of
+// these sits inside a template literal — a `//` there would render as text in
+// the panel rather than being a comment.
+//
+// A checker that always reports the same known-safe lines is one people learn
+// to ignore, and then it stops catching the real ones too. Each entry says why.
+const ALLOW = [
+  // Nothing needed here — every hit this reports is a real one.
+];
+
 const root = process.argv[2] || 'html/js';
 
 const files = [];
@@ -55,6 +67,8 @@ for (const file of files) {
     for (const m of line.matchAll(EVENT_ATTR)) attrRanges.push([m.index, m.index + m[0].length]);
 
     for (const m of line.matchAll(RE)) {
+      if (ALLOW.some((a) => a.match === m[0])) continue;
+
       const body = m[0].slice(2, -1);   // inside the ${ }
 
       // .length and friends are numbers; escaping a number is noise.
