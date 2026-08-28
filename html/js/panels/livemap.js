@@ -19,7 +19,10 @@ const LIVEMAP = {
     // The GTA world rectangle the render covers. If dots sit slightly off,
     // nudge these — stand somewhere recognisable and adjust until the dot
     // lands on you.
-    world: { minX: -3900, maxX: 4300, minY: -4500, maxY: 8100 },
+    // Calibrated against landmarks with known coordinates — the depot on
+    // Terminal Island, Sandy Shores airfield, Mount Chiliad, Paleto Bay. The
+    // old numbers put the trucking depot in the sea.
+    world: { minX: -4508, maxX: 5086, minY: -4891, maxY: 8317 },
 
     pollMs: 4000,
 };
