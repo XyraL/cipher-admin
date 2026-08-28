@@ -419,6 +419,7 @@ function openBanModal(src, cid, name) {
             <select class="select" id="ban-duration">
                 ${(CA.banPresets || []).map(p => `<option value="${p.seconds}">${esc(p.label)}</option>`).join('')}
             </select>
+            <div class="form-hint" id="ban-history-note">Checking ban history…</div>
         </div>
         <div class="form-group">
             <label>Quick reasons</label>
@@ -432,6 +433,41 @@ function openBanModal(src, cid, name) {
         <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
         <button class="btn btn-danger" data-ca-action="doBan" data-src="${escNum(src)}" data-cid="${escAttr(cid)}" data-name="${escAttr(name || '')}">Ban</button>
     `);
+    applyBanLadder(cid);
+}
+
+// The ladder. Prior bans decide the suggested duration — 1 day, then a week,
+// then a month, then permanent — snapped to whichever preset is closest, and
+// preselected rather than forced: the admin can always pick something else.
+const BAN_LADDER = [86400, 604800, 2592000, 0];
+
+async function applyBanLadder(cid) {
+    const note = document.getElementById('ban-history-note');
+    const sel = document.getElementById('ban-duration');
+    if (!note || !sel) return;
+
+    const history = cid ? await caFetch('cipher-admin:server:getBanHistory', { citizenid: cid }) : null;
+    if (!document.getElementById('ban-history-note')) return;   // modal closed meanwhile
+
+    const count = (history && history.count) || 0;
+    const target = BAN_LADDER[Math.min(count, BAN_LADDER.length - 1)];
+
+    let best = null;
+    let bestDiff = Infinity;
+    for (const opt of sel.options) {
+        const v = parseInt(opt.value);
+        if (target === 0) {
+            if (v === 0) { best = opt; break; }
+        } else if (v > 0 && Math.abs(v - target) < bestDiff) {
+            bestDiff = Math.abs(v - target);
+            best = opt;
+        }
+    }
+    if (best) best.selected = true;
+
+    note.innerHTML = count === 0
+        ? `No previous bans — suggested: <b>${best ? esc(best.textContent) : '1 day'}</b>`
+        : `<span style="color:var(--amber);">${count} previous ban${count === 1 ? '' : 's'}</span> — suggested: <b>${best ? esc(best.textContent) : 'permanent'}</b>`;
 }
 
 function setBanReason(r) { const el = document.getElementById('ban-reason'); if (el) el.value = r; }
@@ -667,8 +703,8 @@ caAction('setWarnReason', (d) => setWarnReason(d.reason));
 caAction('setBanReason',  (d) => setBanReason(d.reason));
 
 caAction('doKick',       (d) => doKick(Number(d.src), d.cid, d.name));
-caAction('doWarn',       (d) => doWarn(Number(d.src), d.cid, d.name));
-caAction('doBan',        (d) => doBan(Number(d.src), d.cid, d.name));
+caAction('doWarn',       (d) => doWarn(Number(d.src) > 0 ? Number(d.src) : null, d.cid, d.name));
+caAction('doBan',        (d) => doBan(Number(d.src) > 0 ? Number(d.src) : null, d.cid, d.name));
 caAction('doSetMoney',   (d) => doSetMoney(Number(d.src), d.cid, d.name));
 caAction('doSetJob',     (d) => doSetJob(Number(d.src), d.cid, d.name));
 caAction('addNote',      (d) => addNote(d.cid, d.name));

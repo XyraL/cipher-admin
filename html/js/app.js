@@ -223,10 +223,15 @@ function switchPanel(name) {
         stats:       'Server Stats',
         self:        'Self Actions',
         adminchat:   'Admin Chat',
+        livemap:     'Live Map',
     };
     document.getElementById('topbar-title').textContent = titles[name] || name;
 
     closePlayerProfile();
+
+    // The map only polls while somebody is looking at it.
+    if (name === 'livemap') startLiveMap();
+    else if (typeof stopLiveMap === 'function') stopLiveMap();
 
     if (name === 'players')     loadPlayers();
     if (name === 'spawner')     loadSpawner();

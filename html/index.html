@@ -15,6 +15,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Saira:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
 </head>
 <body>
 <div id="admin-overlay" class="hidden">
@@ -42,6 +43,11 @@
             <li class="nav-item" data-panel="character">
                 <span class="nav-icon" data-icon="character"></span>
                 <span class="nav-label">Character Lookup</span>
+            </li>
+            <li class="nav-item" data-panel="livemap">
+                <span class="nav-icon" data-icon="players"></span>
+                <span class="nav-label">Live Map</span>
+                <span class="nav-badge" id="badge-livemap"></span>
             </li>
             <li class="nav-divider"></li>
             <li class="nav-item" data-panel="spawner">
@@ -146,6 +152,19 @@
             <div id="panel-self" class="panel"></div>
 
             <!-- ── Admin Chat ── -->
+            <div id="panel-livemap" class="panel">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                    <div style="font-size:12px;color:var(--text-muted);">
+                        <b id="livemap-count">0</b> players on ·
+                        <span style="color:#4c9aff;">●</span> on foot
+                        <span style="color:#f5a524;">●</span> in a vehicle
+                        <span style="color:#6b7280;">●</span> down
+                    </div>
+                    <span style="font-size:11px;color:var(--text-muted);">Updates every few seconds while open</span>
+                </div>
+                <div id="livemap-canvas" style="height:calc(100vh - 190px);min-height:420px;border-radius:10px;overflow:hidden;background:#0a0e14;"></div>
+            </div>
+
             <div id="panel-adminchat" class="panel">
                 <div class="section-header mb-12">
                     <div>
@@ -212,6 +231,8 @@
 <script src="js/panels/entities.js"></script>
 <script src="js/panels/stats.js"></script>
 <script src="js/panels/self.js"></script>
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="js/panels/livemap.js"></script>
 <script src="js/panels/adminchat.js"></script>
 </body>
 </html>

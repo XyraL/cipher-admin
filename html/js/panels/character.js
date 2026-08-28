@@ -115,6 +115,13 @@ async function openCharProfile(citizenid) {
             <div class="profile-row"><span class="profile-row-label">DOB</span><span class="profile-row-value">${ci.birthdate || 'N/A'}</span></div>
             <div class="profile-row"><span class="profile-row-label">Gender</span><span class="profile-row-value">${ci.gender === 0 ? 'Male' : 'Female'}</span></div>
             <div class="profile-row"><span class="profile-row-label">Phone</span><span class="profile-row-value">${ci.phone || 'N/A'}</span></div>
+            <div class="profile-row" style="border-bottom:0;padding-bottom:2px;">
+                <span class="profile-row-label">Actions</span>
+                <span class="profile-row-value" style="display:flex;gap:6px;">
+                    <button class="btn btn-amber btn-xs" onclick="openWarnModal(${profile.onlineSrc != null ? profile.onlineSrc : 'null'}, '${escAttr(citizenid)}', '${escAttr(name)}')">⚠ Warn</button>
+                    <button class="btn btn-danger btn-xs" onclick="openBanModal(${profile.onlineSrc != null ? profile.onlineSrc : 'null'}, '${escAttr(citizenid)}', '${escAttr(name)}')">🔨 Ban</button>
+                </span>
+            </div>
             <div class="profile-row"><span class="profile-row-label">Status</span><span class="profile-row-value"><span class="status-dot ${isOnline ? 'online' : 'offline'}"></span> ${isOnline ? 'Online (ID '+profile.onlineSrc+')' : 'Offline'}</span></div>
         </div>
         <div class="profile-section">

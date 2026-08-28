@@ -199,6 +199,10 @@ To assign a role to a player, use the Permissions panel or set it directly in th
 
 ## Features
 
+- **Live map** — every player on a map of San Andreas, updating while you watch. Blue on foot, amber in a vehicle, grey down. Click a dot to spectate, go to or bring them
+- **Offline warns and bans** — warn or ban straight from the character lookup, whether they're online or not
+- **Temp-ban ladder** — the ban menu checks their history and suggests the next step up: 1 day, then a week, then a month, then permanent. Just a suggestion, you can always pick
+
 ### Player Management
 - Live player list with online time tracker and notes tooltip
 - Kick, warn, temp/permban with reason

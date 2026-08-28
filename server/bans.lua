@@ -146,6 +146,22 @@ lib.callback.register('cipher-admin:server:getBans', function(src, data)
 end)
 
 -- ── Issue warning ─────────────────────────────────────────────────────────────
+-- How many times this character has been banned before. The ban modal uses it
+-- to suggest the next rung of the ladder — repeat offenders climb, first-timers
+-- start at the bottom.
+lib.callback.register('cipher-admin:server:getBanHistory', function(src, data)
+    if not IsAdmin(src) then return nil end
+    local cid = data and data.citizenid
+    if not cid or cid == '' then return { count = 0 } end
+
+    local count = MySQL.scalar.await(
+        'SELECT COUNT(*) FROM admin_bans WHERE citizenid = ?', { cid }) or 0
+    local last = MySQL.single.await(
+        'SELECT reason, created_at, is_permanent FROM admin_bans WHERE citizenid = ? ORDER BY id DESC LIMIT 1', { cid })
+
+    return { count = count, last = last }
+end)
+
 lib.callback.register('cipher-admin:server:warnPlayer', function(src, data)
     if not IsAdmin(src) then return false end
     if not HasPermission(src, 'warn') then return false end

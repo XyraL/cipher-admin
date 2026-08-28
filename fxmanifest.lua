@@ -3,7 +3,7 @@ game 'gta5'
 
 name        'Cipher-Admin'
 description 'Advanced Admin Suite for QBox / QBCore'
-version     '1.3.1'
+version     '2.0.0'
 author      'XyraL'
 
 shared_scripts {
@@ -36,6 +36,7 @@ server_scripts {
     'server/identity.lua',
     'server/threats.lua',
     'server/players.lua',
+    'server/livemap.lua',
     'server/bans.lua',
     'server/mutes.lua',
     'server/inventory.lua',
@@ -52,6 +53,14 @@ files {
     'html/js/core.js',
     'html/js/app.js',
     'html/js/panels/dashboard.js',
+    'html/js/panels/livemap.js',
+    -- Leaflet is vendored (BSD-2) — NUI has no reliable internet, so no CDN.
+    'html/vendor/leaflet/leaflet.js',
+    'html/vendor/leaflet/leaflet.css',
+    'html/vendor/leaflet/images/*.png',
+    'html/vendor/leaflet/LICENSE.txt',
+    -- Map tile pyramid, shared with the MDT's live map.
+    'html/assets/maps/tiles/*.webp',
     'html/js/panels/players.js',
     'html/js/panels/character.js',
     'html/js/panels/spawner.js',

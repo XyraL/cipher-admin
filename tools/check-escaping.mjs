@@ -31,9 +31,8 @@ const FREE_TEXT = [
 // A checker that always reports the same known-safe lines is one people learn
 // to ignore, and then it stops catching the real ones too. Each entry says why.
 const ALLOW = [
-  { match: '${PCR_PRIORITY[p].label}', why: 'PCR_PRIORITY is a const defined in that file' },
-  { match: '${s.label}',               why: 'reads INCIDENT_STATUS_LABELS, a const in that file' },
-  { match: "${data.vehicle.fuel ? Math.round(data.vehicle.fuel) + '%' : '—'}", why: 'a number' },
+  { match: "${p.vehicle ? ' · in vehicle' : ''}",
+    why: 'a ternary between two literal strings; no player text in it' },
 ];
 
 const root = process.argv[2] || 'html/js';

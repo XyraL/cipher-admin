@@ -173,6 +173,8 @@ local PROXY_ENDPOINTS = {
     'cipher-admin:server:massAction',
     'cipher-admin:server:getPlayerIdentifiers',
     'cipher-admin:server:mutePlayer',
+    'cipher-admin:server:getLiveMap',
+    'cipher-admin:server:getBanHistory',
 }
 
 for _, endpoint in ipairs(PROXY_ENDPOINTS) do
